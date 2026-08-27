@@ -1,12 +1,16 @@
 # Panduan Sistem Autentikasi dan Otorisasi (RBAC)
 
-Dokumen ini menjelaskan seluruh komponen autentikasi dan otorisasi berbasis role (Role-Based Access Control / RBAC) yang telah diimplementasikan dalam Laravel project ini.
+Dokumen ini menjelaskan seluruh komponen autentikasi dan otorisasi berbasis role (Role-Based Access Control / RBAC) yang telah diimplementasikan dalam sistem manajemen project ini.
+
+Sistem ini menggunakan arsitektur **Decoupled (Terpisah)**:
+- **Backend**: Laravel REST API (berjalan di port `8000`)
+- **Frontend**: Next.js dengan TypeScript & Tailwind CSS (berjalan di port `3000`)
 
 ---
 
 ## 1. Apa Saja yang Sudah Tersedia?
 
-Sistem telah memiliki fondasi autentikasi yang lengkap dan siap digunakan untuk **Opsi A (Inertia + React)** maupun pengujian REST API:
+Sistem telah memiliki fondasi autentikasi stateful (cookie-based) SPA menggunakan Laravel Sanctum yang terintegrasi secara dinamis dengan frontend Next.js:
 
 1. **Struktur Database (MySQL)**
    - **Tabel `roles`**: Menyimpan data role (`role_id`, `role_name`, `display_name`, `description`, `created_at`).
@@ -14,18 +18,19 @@ Sistem telah memiliki fondasi autentikasi yang lengkap dan siap digunakan untuk 
    - Hubungan foreign key yang aman antara `users.role_id` ke `roles.role_id` (`onDelete('restrict')`).
    
 2. **Model & Relationship (Eloquent)**
-   - [`User.php`](file:///d:/SEMESTER%207/magang/ProjectManagementSystem/project-management-system/app/Models/User.php): Model user yang terintegrasi dengan trait `HasApiTokens` (Sanctum), mass-assignment protection (`$fillable`), password auto-hashing (`casts`), dan relasi `belongsTo` ke `Role`.
-   - [`Role.php`](file:///d:/SEMESTER%207/magang/ProjectManagementSystem/project-management-system/app/Models/Role.php): Model role dengan konstanta role (`SUPER_ADMIN`, `PROJECT_MANAGER`, `MEMBER`, `VIEWER`), daftar validasi `ALL_ROLES`, dan relasi `hasMany` ke `User`.
+   - [`User.php`](file:///d:/SEMESTER 7/magang/ProjectManagementSystem/project-management-system/app/Models/User.php): Model user yang terintegrasi dengan trait `HasApiTokens` (Sanctum), mass-assignment protection (`$fillable`), password auto-hashing (`casts`), dan relasi `belongsTo` ke `Role`.
+   - [`Role.php`](file:///d:/SEMESTER 7/magang/ProjectManagementSystem/project-management-system/app/Models/Role.php): Model role dengan konstanta role (`SUPER_ADMIN`, `PROJECT_MANAGER`, `MEMBER`, `CLIENT`), daftar validasi `ALL_ROLES`, dan relasi `hasMany` ke `User`.
 
 3. **Controller & Validation Request**
-   - [`AuthController.php`](file:///d:/SEMESTER%207/magang/ProjectManagementSystem/project-management-system/app/Http/Controllers/Auth/AuthController.php): Menangani business logic login (dengan session fixation protection via `session()->regenerate()`), registrasi user baru (khusus Super Admin), logout, dan pengambilan data profile (`/me`).
-   - [`LoginRequest.php`](file:///d:/SEMESTER%207/magang/ProjectManagementSystem/project-management-system/app/Http/Requests/Auth/LoginRequest.php) & [`RegisterRequest.php`](file:///d:/SEMESTER%207/magang/ProjectManagementSystem/project-management-system/app/Http/Requests/Auth/RegisterRequest.php): Form Request Validation untuk memisahkan logic validasi input dari Controller, lengkap dengan pesan error kustom bahasa Indonesia.
+   - [`AuthController.php`](file:///d:/SEMESTER 7/magang/ProjectManagementSystem/project-management-system/app/Http/Controllers/Auth/AuthController.php): Menangani business logic login (dengan session fixation protection via `session()->regenerate()`), registrasi user baru (khusus Super Admin), logout, dan pengambilan data profile (`/me`).
+   - [`LoginRequest.php`](file:///d:/SEMESTER 7/magang/ProjectManagementSystem/project-management-system/app/Http/Requests/Auth/LoginRequest.php) & [`RegisterRequest.php`](file:///d:/SEMESTER 7/magang/ProjectManagementSystem/project-management-system/app/Http/Requests/Auth/RegisterRequest.php): Form Request Validation untuk memisahkan logic validasi input dari Controller, lengkap dengan pesan error kustom bahasa Indonesia.
 
 4. **Middleware Otorisasi Backend**
-   - [`RoleMiddleware.php`](file:///d:/SEMESTER%207/magang/ProjectManagementSystem/project-management-system/app/Http/Middleware/RoleMiddleware.php): Memvalidasi akses endpoint berdasarkan role secara backend. Jika user tidak memiliki role yang diizinkan, system menolak request dengan response `403 Forbidden`.
+   - [`RoleMiddleware.php`](file:///d:/SEMESTER 7/magang/ProjectManagementSystem/project-management-system/app/Http/Middleware/RoleMiddleware.php): Memvalidasi akses endpoint berdasarkan role secara backend. Jika user tidak memiliki role yang diizinkan, system menolak request dengan response `403 Forbidden`.
 
-5. **API Routing**
-   - [`api.php`](file:///d:/SEMESTER%207/magang/ProjectManagementSystem/project-management-system/routes/api.php): Mendaftarkan rute publik `/api/login` dan rute terproteksi `/api/me`, `/api/logout` (semua role), serta `/api/register` (khusus role `super_admin`).
+5. **API Routing & CORS**
+   - [`api.php`](file:///d:/SEMESTER 7/magang/ProjectManagementSystem/project-management-system/routes/api.php): Mendaftarkan rute publik `/api/login` dan rute terproteksi `/api/me`, `/api/logout` (semua role), serta `/api/register` (khusus role `super_admin`).
+   - [`cors.php`](file:///d:/SEMESTER 7/magang/ProjectManagementSystem/project-management-system/config/cors.php): Mengizinkan domain frontend (localhost:3000) untuk berkomunikasi secara cross-origin dan mengirimkan session credentials.
 
 6. **Database Seeder & Dummy Users**
    - Telah ditambahkan data dummy user untuk masing-masing role dengan password default: `password123`.
@@ -36,130 +41,49 @@ Sistem telah memiliki fondasi autentikasi yang lengkap dan siap digunakan untuk 
 
 Semua user di bawah ini telah terdaftar di database `db_management` melalui `DatabaseSeeder`:
 
-| Role | Username | Email | Password | Hak Akses |
+| Role | Username | Email | Password | Hak Akses & Tampilan Dashboard |
 |---|---|---|---|---|
-| **Super Admin** | `superadmin` | `superadmin@pm.test` | `password123` | Akses penuh, mengelola user/role/permission, registrasi user baru. |
-| **Project Manager** | `projectmanager` | `pm@pm.test` | `password123` | Membuat project, mengelola task & anggota. |
-| **Member** | `member` | `member@pm.test` | `password123` | Melihat project diikuti, mengubah status task, memberi komentar. |
-| **Viewer** | `viewer` | `viewer@pm.test` | `password123` | Hanya membaca progress project/task tertentu, dilarang edit. |
+| **Super Admin** | `superadmin` | `superadmin@pm.test` | `password123` | Akses penuh sistem, kelola user/role/permission, registrasi user baru. |
+| **Project Manager** | `projectmanager` | `pm@pm.test` | `password123` | Membuat project, memantau anggota tim, mengelola task & approval. |
+| **Member** | `member` | `member@pm.test` | `password123` | Melihat project diikuti, update status pengerjaan task, memberi komentar. |
+| **Client** | `client` | `client@pm.test` | `password123` | Memantau perkembangan milestone project secara transparan (read-only). |
 
 ---
 
-## 3. Cara Menguji Login (Verifikasi Role)
+## 3. Komponen Frontend (Next.js App)
 
-Pengujian dapat dilakukan dengan mudah menggunakan **Postman**, **Bruno**, atau **PowerShell/cURL**.
+Frontend dibangun di dalam folder `frontend/` menggunakan Next.js (App Router), TypeScript, dan Tailwind CSS:
 
-### A. Alur Sanctum Stateful (Session / Cookies) - Sesuai Opsi A (Inertia)
-Sebelum mengirim request API, client (seperti browser atau Postman) harus mendapatkan session cookie dari Laravel.
-
-1. **Dapatkan CSRF Cookie**
-   - **Method**: `GET`
-   - **URL**: `http://localhost:8000/sanctum/csrf-cookie`
-   - **Fungsi**: Laravel akan mengirimkan cookie `XSRF-TOKEN` ke client.
-
-2. **Kirim Login Request**
-   - **Method**: `POST`
-   - **URL**: `http://localhost:8000/api/login`
-   - **Headers**:
-     - `Accept: application/json`
-     - `Content-Type: application/json`
-   - **Body (JSON)**:
-     ```json
-     {
-       "email": "superadmin@pm.test",
-       "password": "password123"
-     }
-     ```
-   - **Response Sukses (200 OK)**:
-     ```json
-     {
-       "success": true,
-       "message": "Login berhasil.",
-       "data": {
-         "user": {
-           "user_id": 1,
-           "username": "superadmin",
-           "email": "superadmin@pm.test",
-           "role": {
-             "role_id": 1,
-             "role_name": "super_admin",
-             "display_name": "Super Admin"
-           },
-           "is_active": true,
-           "created_at": "..."
-         }
-       }
-     }
-     ```
-
-3. **Cek Identitas User Login (`/me`)**
-   - **Method**: `GET`
-   - **URL**: `http://localhost:8000/api/me`
-   - **Headers**:
-     - `Accept: application/json`
-   - **Fungsi**: Memverifikasi bahwa session cookie bekerja dan server mengenali user beserta role-nya dengan benar.
-
-4. **Uji Otorisasi Middleware (Contoh: Rute Khusus Super Admin)**
-   - Coba akses rute register baru dengan **Super Admin**:
-     - **Method**: `POST`
-     - **URL**: `http://localhost:8000/api/register`
-     - **Body**:
-       ```json
-       {
-         "username": "newuser",
-         "email": "newuser@pm.test",
-         "password": "password123",
-         "password_confirmation": "password123",
-         "role_id": 3
-       }
-       ```
-     - **Hasil**: Sukses `201 Created`.
-   - Coba akses rute register baru setelah login sebagai **Project Manager** (`pm@pm.test`):
-     - **Hasil**: Ditolak dengan `403 Forbidden` (`Anda tidak memiliki akses untuk tindakan ini`).
+1. **Authentication Context (`auth-context.tsx`)**:
+   Menyediakan global state management untuk mengecek status autentikasi user saat ini, login, logout, dan memicu redirect otomatis.
+2. **API Client (`api.ts`)**:
+   Instance Axios yang terkonfigurasi dengan `withCredentials: true` untuk Sanctum SPA flow dan penanganan CSRF cookie.
+3. **Login Page (`login/page.tsx`)**:
+   Halaman login premium dengan validasi form, loading states, dan error handling real-time dari API.
+4. **Dashboard Layout (`dashboard/layout.tsx`)**:
+   Shared layout dinamis yang menyediakan sidebar navigasi yang berubah sesuai role, avatar profil, dan tombol **Keluar (Logout)** di header kanan atas serta bagian bawah sidebar.
+5. **Dynamic Dashboard (`dashboard/page.tsx`)**:
+   Halaman dashboard tunggal yang merender data secara dinamis berdasarkan role user yang aktif (Super Admin, PM, Member, Client).
 
 ---
 
-### B. Pengujian Otomatis via Script PowerShell
-Anda dapat memverifikasi semua role langsung dari terminal PowerShell dengan menjalankan perintah berikut:
+## 4. Cara Menjalankan Aplikasi
 
-```powershell
-$users = @(
-    @{email="superadmin@pm.test"; password="password123"; role="super_admin"},
-    @{email="pm@pm.test"; password="password123"; role="project_manager"},
-    @{email="member@pm.test"; password="password123"; role="member"},
-    @{email="viewer@pm.test"; password="password123"; role="viewer"}
-);
-foreach ($u in $users) {
-    $body = @{ email = $u.email; password = $u.password } | ConvertTo-Json;
-    $sessVar = "session_" + $u.role;
-    try {
-        # 1. Dapatkan CSRF cookie
-        $null = Invoke-RestMethod -Uri "http://localhost:8000/sanctum/csrf-cookie" -Method GET -SessionVariable $sessVar -Headers @{ "Origin"="http://localhost"; "Referer"="http://localhost/" };
-        $sessionObj = Get-Variable -Name $sessVar -ValueOnly;
-        
-        # 2. Login
-        $loginRes = Invoke-RestMethod -Uri "http://localhost:8000/api/login" -Method POST -ContentType "application/json" -Body $body -Headers @{ "Accept"="application/json"; "Origin"="http://localhost"; "Referer"="http://localhost/" } -WebSession $sessionObj;
-        
-        # 3. Akses Profile /me
-        $meRes = Invoke-RestMethod -Uri "http://localhost:8000/api/me" -Method GET -Headers @{ "Accept"="application/json"; "Origin"="http://localhost"; "Referer"="http://localhost/" } -WebSession $sessionObj;
-        
-        Write-Host "Verifikasi Sukses! User: $($u.email) -> Terdeteksi sebagai Role: $($meRes.data.user.role.display_name)" -ForegroundColor Green;
-    } catch {
-        Write-Error "Gagal memverifikasi user $($u.email): $_";
-    }
-}
+Pastikan database MySQL Anda sudah menyala dan dikonfigurasi pada file `.env` Laravel backend.
+
+### A. Jalankan Backend (Laravel API)
+Masuk ke direktori utama, kemudian jalankan server:
+```bash
+php artisan serve
 ```
+*Backend berjalan di: **`http://localhost:8000`***
 
----
+### B. Jalankan Frontend (Next.js)
+Buka terminal baru, arahkan ke folder `frontend`, dan nyalakan development server:
+```bash
+cd frontend
+npm run dev
+```
+*Frontend berjalan di: **`http://localhost:3000`***
 
-## 4. Penjelasan Teknis & Alur Kerja (Apa Maksudnya?)
-
-1. **Kenapa tabel `roles` dan `users` dipisah?**
-   - Sesuai prinsip normalisasi database (1NF, 2NF, 3NF), role dipisah ke tabel master agar deskripsi dan nama role bersifat konsisten, tidak redundan di tabel users, serta memudahkan perluasan role baru (scalable) di masa depan tanpa mengubah struktur kolom tabel users.
-   
-2. **Di mana otorisasi dilakukan?**
-   - Otorisasi sepenuhnya dikontrol di **Backend** menggunakan [`RoleMiddleware`](file:///d:/SEMESTER%207/magang/ProjectManagementSystem/project-management-system/app/Http/Middleware/RoleMiddleware.php). Jika client mencoba mengirim request manipulatif langsung ke endpoint API tanpa hak akses role yang sesuai, backend akan menolaknya. Ini memenuhi kriteria keamanan di brief (tidak hanya menyembunyikan tombol di frontend).
-
-3. **Bagaimana session fixation & token hijacking dicegah?**
-   - Saat login berhasil, backend memanggil `$request->session()->regenerate()` untuk membuat session ID baru, yang menghentikan serangan Session Fixation.
-   - Form Request Validation memvalidasi semua parameter input sebelum masuk ke controller untuk mencegah injeksi data kotor (data integrity).
+Akses halaman utama di browser melalui URL **`http://localhost:3000`** untuk menguji sistem login dan dashboard dinamis.
