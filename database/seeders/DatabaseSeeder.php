@@ -9,13 +9,14 @@ class DatabaseSeeder extends Seeder
     /**
      * Seed the application's database.
      *
-     * Urutan penting: Role harus dibuat sebelum User
-     * karena User memiliki foreign key ke Role.
+     * Run order matters:
+     * 1. RoleAndPermissionSeeder — must create roles before UserSeeder assigns them
+     * 2. UserSeeder              — creates default users and assigns Spatie roles
      */
     public function run(): void
     {
         $this->call([
-            RoleSeeder::class,
+            RoleAndPermissionSeeder::class,
             UserSeeder::class,
         ]);
     }

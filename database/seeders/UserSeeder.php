@@ -2,62 +2,65 @@
 
 namespace Database\Seeders;
 
-use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
 /**
- * Seeder untuk membuat user default untuk setiap role.
- * Semua user default menggunakan password: password123
- * Jalankan: php artisan db:seed --class=UserSeeder
+ * UserSeeder — Creates one default user per role for development/testing.
+ *
+ * REFACTORED: Removed all custom role_id FK usage.
+ * Roles now assigned via Spatie's $user->assignRole() method.
+ *
+ * Default password: password123
  */
 class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        $superAdminRole = Role::where('role_name', Role::SUPER_ADMIN)->first();
-        $pmRole = Role::where('role_name', Role::PROJECT_MANAGER)->first();
-        $memberRole = Role::where('role_name', Role::MEMBER)->first();
-        $clientRole = Role::where('role_name', Role::CLIENT)->first();
-
-        // Super Admin default
-        User::updateOrCreate(
-            ['email' => 'superadmin@pm.test'],
+        $users = [
             [
                 'username' => 'superadmin',
-                'password' => 'password123', // Auto-hashed via model cast
-                'role_id'  => $superAdminRole->role_id,
-            ]
-        );
-
-        // Project Manager default
-        User::updateOrCreate(
-            ['email' => 'pm@pm.test'],
+                'email'    => 'superadmin@pm.test',
+                'password' => 'password123',
+                'role'     => 'super_admin',
+            ],
             [
                 'username' => 'projectmanager',
+                'email'    => 'pm@pm.test',
                 'password' => 'password123',
-                'role_id'  => $pmRole->role_id,
-            ]
-        );
-
-        // Member default
-        User::updateOrCreate(
-            ['email' => 'member@pm.test'],
+                'role'     => 'project_manager',
+            ],
             [
                 'username' => 'member',
+                'email'    => 'member@pm.test',
                 'password' => 'password123',
-                'role_id'  => $memberRole->role_id,
-            ]
-        );
-
-        // Client default
-        User::updateOrCreate(
-            ['email' => 'client@pm.test'],
+                'role'     => 'member',
+            ],
             [
-                'username' => 'client',
+                'username' => 'viewer',
+                'email'    => 'viewer@pm.test',
                 'password' => 'password123',
-                'role_id'  => $clientRole->role_id,
-            ]
-        );
+                'role'     => 'viewer',
+            ],
+        ];
+
+        foreach ($users as $userData) {
+            $role = $userData['role'];
+
+            $user = User::updateOrCreate(
+                ['email' => $userData['email']],
+                [
+                    'username'  => $userData['username'],
+                    'password'  => $userData['password'], // Auto-hashed via model cast
+                    'is_active' => true,
+                ]
+            );
+
+            // Assign role via Spatie — replaces old role_id FK
+            // syncRoles() ensures idempotency (safe to re-seed)
+            $user->syncRoles([$role]);
+        }
+
+        $this->command->info('✅ Default users seeded with Spatie roles.');
     }
 }

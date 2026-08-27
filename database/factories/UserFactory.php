@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -10,6 +9,9 @@ use Illuminate\Support\Str;
 
 /**
  * @extends Factory<User>
+ *
+ * REFACTORED: Removed role_id FK — roles now managed by Spatie.
+ * Use ->withRole('project_manager') after factory creation to assign roles.
  */
 class UserFactory extends Factory
 {
@@ -29,24 +31,29 @@ class UserFactory extends Factory
             'username'       => fake()->unique()->userName(),
             'email'          => fake()->unique()->safeEmail(),
             'password'       => static::$password ??= Hash::make('password'),
-            'role_id'        => Role::where('role_name', Role::MEMBER)->first()?->role_id ?? 1,
             'is_active'      => true,
             'remember_token' => Str::random(10),
         ];
     }
 
     /**
-     * Set role tertentu pada factory.
+     * Assign a Spatie role to the created user.
+     *
+     * Note: Spatie roles are assigned AFTER model creation via afterCreating()
+     * callback because they require the model to exist in the DB first.
+     *
+     * Usage:
+     *   User::factory()->withRole('project_manager')->create();
      */
     public function withRole(string $roleName): static
     {
-        return $this->state(fn (array $attributes) => [
-            'role_id' => Role::where('role_name', $roleName)->first()->role_id,
-        ]);
+        return $this->afterCreating(function (User $user) use ($roleName) {
+            $user->assignRole($roleName);
+        });
     }
 
     /**
-     * Set user sebagai inactive.
+     * Set user as inactive.
      */
     public function inactive(): static
     {

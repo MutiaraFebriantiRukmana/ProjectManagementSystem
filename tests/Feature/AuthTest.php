@@ -2,15 +2,21 @@
 
 namespace Tests\Feature;
 
-use App\Models\Role;
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Database\Seeders\RoleAndPermissionSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
 {
-    // Menggunakan DatabaseTransactions agar database tetap bersih setelah test
-    use DatabaseTransactions;
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(RoleAndPermissionSeeder::class);
+    }
 
     /**
      * Test login untuk semua role yang telah seeded di database.
@@ -21,62 +27,37 @@ class AuthTest extends TestCase
             [
                 'email' => 'superadmin@pm.test',
                 'role_name' => 'super_admin',
-                'display_name' => 'Super Admin'
             ],
             [
                 'email' => 'pm@pm.test',
                 'role_name' => 'project_manager',
-                'display_name' => 'Project Manager'
             ],
             [
                 'email' => 'member@pm.test',
                 'role_name' => 'member',
-                'display_name' => 'Member'
             ],
             [
                 'email' => 'viewer@pm.test',
                 'role_name' => 'viewer',
-                'display_name' => 'Viewer'
             ],
         ];
 
         foreach ($users as $u) {
-            $response = $this->postJson('/api/login', [
+            $user = User::factory()->create(['email' => $u['email']]);
+            $user->assignRole($u['role_name']);
+
+            $response = $this->post('/login', [
                 'email' => $u['email'],
-                'password' => 'password123',
+                'password' => 'password', // Default factory password
             ]);
 
-            $response->assertStatus(200)
-                ->assertJsonStructure([
-                    'success',
-                    'message',
-                    'data' => [
-                        'user' => [
-                            'user_id',
-                            'username',
-                            'email',
-                            'role' => [
-                                'role_id',
-                                'role_name',
-                                'display_name',
-                            ],
-                            'is_active',
-                            'created_at',
-                        ]
-                    ]
-                ])
-                ->assertJson([
-                    'success' => true,
-                    'data' => [
-                        'user' => [
-                            'email' => $u['email'],
-                            'role' => [
-                                'role_name' => $u['role_name'],
-                                'display_name' => $u['display_name'],
-                            ]
-                        ]
-                    ]
-                ]);
+            $response->assertRedirect(route('projects.index'));
+            $response->assertSessionHas('success', 'Login berhasil.');
+            $this->assertAuthenticatedAs($user);
+
+            // Log out for next iteration
+            $this->post('/logout');
+            $this->assertGuest();
         }
     }
 
@@ -85,16 +66,16 @@ class AuthTest extends TestCase
      */
     public function test_login_fails_with_invalid_credentials(): void
     {
-        $response = $this->postJson('/api/login', [
+        $user = User::factory()->create(['email' => 'superadmin@pm.test']);
+        $user->assignRole('super_admin');
+
+        $response = $this->post('/login', [
             'email' => 'superadmin@pm.test',
             'password' => 'wrong_password',
         ]);
 
-        $response->assertStatus(401)
-            ->assertJson([
-                'success' => false,
-                'message' => 'Email atau password salah.',
-            ]);
+        $response->assertSessionHasErrors('email');
+        $this->assertGuest();
     }
 
     /**
@@ -102,51 +83,39 @@ class AuthTest extends TestCase
      */
     public function test_login_fails_if_user_is_inactive(): void
     {
-        // Cari user member, nonaktifkan sementara untuk testing
-        $user = User::where('email', 'member@pm.test')->first();
-        $user->is_active = false;
-        $user->save();
+        $user = User::factory()->inactive()->create(['email' => 'member@pm.test']);
+        $user->assignRole('member');
 
-        $response = $this->postJson('/api/login', [
+        $response = $this->post('/login', [
             'email' => 'member@pm.test',
-            'password' => 'password123',
+            'password' => 'password',
         ]);
 
-        $response->assertStatus(403)
-            ->assertJson([
-                'success' => false,
-                'message' => 'Akun Anda telah dinonaktifkan. Hubungi administrator.',
-            ]);
+        $response->assertSessionHasErrors('email');
+        $this->assertGuest();
     }
 
     /**
-     * Test akses /api/me untuk user terautentikasi dan tamu (unauthenticated).
+     * Test akses /me untuk user terautentikasi dan tamu (unauthenticated).
      */
     public function test_profile_endpoint_access(): void
     {
-        // 1. Tamu (Unauthenticated) harus ditolak 401
-        $guestResponse = $this->getJson('/api/me');
-        $guestResponse->assertStatus(401)
-            ->assertJson([
-                'success' => false,
-                'message' => 'Unauthorized. Silakan login terlebih dahulu.',
-            ]);
+        // 1. Tamu (Unauthenticated) harus ditolak 302 ke login
+        $guestResponse = $this->get('/me');
+        $guestResponse->assertRedirect(route('login'));
 
-        // 2. User Terautentikasi (Super Admin) harus diizinkan
-        $user = User::where('email', 'superadmin@pm.test')->first();
+        // 2. User Terautentikasi (Super Admin) harus diizinkan dan render komponen
+        $user = User::factory()->create(['email' => 'superadmin@pm.test']);
+        $user->assignRole('super_admin');
         
         $authResponse = $this->actingAs($user)
-            ->getJson('/api/me');
+            ->get('/me');
 
-        $authResponse->assertStatus(200)
-            ->assertJson([
-                'success' => true,
-                'data' => [
-                    'user' => [
-                        'email' => 'superadmin@pm.test',
-                    ]
-                ]
-            ]);
+        $authResponse->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Auth/Profile')
+                ->has('user')
+            );
     }
 
     /**
@@ -154,39 +123,38 @@ class AuthTest extends TestCase
      */
     public function test_role_middleware_authorizes_super_admin_only_for_register(): void
     {
-        $superAdmin = User::where('email', 'superadmin@pm.test')->first();
-        $pmUser = User::where('email', 'pm@pm.test')->first();
+        $superAdmin = User::factory()->create(['email' => 'superadmin@pm.test']);
+        $superAdmin->assignRole('super_admin');
+
+        $pmUser = User::factory()->create(['email' => 'pm@pm.test']);
+        $pmUser->assignRole('project_manager');
 
         // 1. Project Manager mencoba register -> Harus Ditolak (403 Forbidden)
         $pmResponse = $this->actingAs($pmUser)
-            ->postJson('/api/register', [
+            ->post('/register', [
                 'username' => 'newuser',
                 'email' => 'newuser@pm.test',
                 'password' => 'password123',
                 'password_confirmation' => 'password123',
-                'role_id' => 3,
+                'role' => 'member',
             ]);
 
-        $pmResponse->assertStatus(403)
-            ->assertJson([
-                'success' => false,
-                'message' => 'Forbidden. Anda tidak memiliki akses untuk tindakan ini.',
-            ]);
+        $pmResponse->assertForbidden();
 
-        // 2. Super Admin mencoba register -> Harus Diizinkan (201 Created)
+        // 2. Super Admin mencoba register -> Harus Diizinkan (302 Redirect back)
         $saResponse = $this->actingAs($superAdmin)
-            ->postJson('/api/register', [
+            ->post('/register', [
                 'username' => 'newmember',
                 'email' => 'newmember@pm.test',
                 'password' => 'password123',
                 'password_confirmation' => 'password123',
-                'role_id' => 3,
+                'role' => 'member',
             ]);
 
-        $saResponse->assertStatus(201)
-            ->assertJson([
-                'success' => true,
-                'message' => 'User berhasil didaftarkan.',
-            ]);
+        $saResponse->assertRedirect();
+        $saResponse->assertSessionHas('success', 'User berhasil didaftarkan.');
+        $this->assertDatabaseHas('users', ['email' => 'newmember@pm.test']);
     }
 }
+
+

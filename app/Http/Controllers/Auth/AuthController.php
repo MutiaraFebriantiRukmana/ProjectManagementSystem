@@ -6,117 +6,78 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class AuthController extends Controller
 {
     /**
-     * Login user.
-     *
-     * Alur:
-     * 1. Validasi input via LoginRequest (Form Request).
-     * 2. Cek kredensial (email + password).
-     * 3. Cek apakah akun aktif (is_active).
-     * 4. Jika berhasil, regenerate session untuk mencegah session fixation attack.
-     * 5. Return user data beserta role-nya.
+     * Show the login page.
      */
-    public function login(LoginRequest $request): JsonResponse
+    public function showLogin(): Response
+    {
+        return Inertia::render('Auth/Login');
+    }
+
+    /**
+     * Login user.
+     */
+    public function login(LoginRequest $request): RedirectResponse
     {
         $credentials = $request->only('email', 'password');
 
-        // Cek kredensial menggunakan Auth facade
-        if (!Auth::attempt($credentials)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Email atau password salah.',
-            ], 401);
+        if (! Auth::attempt($credentials)) {
+            return back()->withErrors([
+                'email' => 'Email atau password salah.',
+            ]);
         }
 
         $user = Auth::user();
 
-        // Cek apakah akun dinonaktifkan oleh Super Admin
-        if (!$user->is_active) {
+        // Check if account has been deactivated by Super Admin
+        if (! $user->is_active) {
             Auth::logout();
-            return response()->json([
-                'success' => false,
-                'message' => 'Akun Anda telah dinonaktifkan. Hubungi administrator.',
-            ], 403);
+            return back()->withErrors([
+                'email' => 'Akun Anda telah dinonaktifkan. Hubungi administrator.',
+            ]);
         }
 
-        // Regenerate session ID untuk mencegah session fixation attack
+        // Prevent session fixation attack
         if ($request->hasSession()) {
             $request->session()->regenerate();
         }
 
-        // Eager load role untuk response
-        $user->load('role');
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Login berhasil.',
-            'data'    => [
-                'user' => [
-                    'user_id'   => $user->user_id,
-                    'username'  => $user->username,
-                    'email'     => $user->email,
-                    'role'      => [
-                        'role_id'      => $user->role->role_id,
-                        'role_name'    => $user->role->role_name,
-                        'display_name' => $user->role->display_name,
-                    ],
-                    'is_active'  => $user->is_active,
-                    'created_at' => $user->created_at,
-                ],
-            ],
-        ], 200);
+        return redirect()->intended(route('projects.index'))->with('success', 'Login berhasil.');
     }
 
     /**
-     * Register user baru (hanya Super Admin).
-     *
-     * Authorization dilakukan di RegisterRequest::authorize().
-     * Password di-hash otomatis melalui User model cast 'hashed'.
+     * Register a new user (Super Admin only).
      */
-    public function register(RegisterRequest $request): JsonResponse
+    public function register(RegisterRequest $request): RedirectResponse
     {
         $user = User::create([
             'username' => $request->username,
             'email'    => $request->email,
-            'password' => $request->password, // Auto-hashed via cast
-            'role_id'  => $request->role_id,
+            'password' => $request->password, // Auto-hashed via model cast
         ]);
 
-        $user->load('role');
+        // Assign role via Spatie
+        if ($request->filled('role')) {
+            $user->assignRole($request->role);
+        } else {
+            $user->assignRole('member'); // Default role
+        }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'User berhasil didaftarkan.',
-            'data'    => [
-                'user' => [
-                    'user_id'   => $user->user_id,
-                    'username'  => $user->username,
-                    'email'     => $user->email,
-                    'role'      => [
-                        'role_id'      => $user->role->role_id,
-                        'role_name'    => $user->role->role_name,
-                        'display_name' => $user->role->display_name,
-                    ],
-                    'is_active'  => $user->is_active,
-                    'created_at' => $user->created_at,
-                ],
-            ],
-        ], 201);
+        return back()->with('success', 'User berhasil didaftarkan.');
     }
 
     /**
      * Logout user.
-     *
-     * 1. Invalidate session saat ini.
-     * 2. Regenerate CSRF token.
      */
-    public function logout(Request $request): JsonResponse
+    public function logout(Request $request): RedirectResponse
     {
         Auth::logout();
 
@@ -125,37 +86,18 @@ class AuthController extends Controller
             $request->session()->regenerateToken();
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Logout berhasil.',
-        ], 200);
+        return redirect()->route('home')->with('success', 'Logout berhasil.');
     }
 
     /**
-     * Get data user yang sedang login beserta role-nya.
+     * Get the authenticated user's profile (can remain as JSON or component if needed, 
+     * but Inertia handles user via props. We'll leave it as a component just in case).
      */
-    public function me(Request $request): JsonResponse
+    public function me(Request $request): Response
     {
-        $user = $request->user();
-        $user->load('role');
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Data user berhasil diambil.',
-            'data'    => [
-                'user' => [
-                    'user_id'    => $user->user_id,
-                    'username'   => $user->username,
-                    'email'      => $user->email,
-                    'role'       => [
-                        'role_id'      => $user->role->role_id,
-                        'role_name'    => $user->role->role_name,
-                        'display_name' => $user->role->display_name,
-                    ],
-                    'is_active'  => $user->is_active,
-                    'created_at' => $user->created_at,
-                ],
-            ],
-        ], 200);
+        return Inertia::render('Auth/Profile', [
+            'user' => $request->user()
+        ]);
     }
 }
+

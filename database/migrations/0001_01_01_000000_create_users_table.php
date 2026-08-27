@@ -4,6 +4,15 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * REFACTORED: Removed custom `roles` table and `role_id` FK from users.
+ * Role management is now delegated to spatie/laravel-permission which provides
+ * its own `roles`, `permissions`, and pivot tables via its own published migration.
+ *
+ * Users table now follows the APP_SPECIFICATION.md SSOT:
+ *   id (BigIncrements), username, email, password, timestamps()
+ *   plus is_active (operational flag) and remember_token for Sanctum.
+ */
 return new class extends Migration
 {
     /**
@@ -11,34 +20,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Tabel roles - menyimpan 4 role utama
-        // Sesuai spesifikasi brief: role_id, role_name
-        Schema::create('roles', function (Blueprint $table) {
-            $table->id('role_id');
-            $table->string('role_name', 50)->unique(); // super_admin, project_manager, member, viewer
-            $table->string('display_name', 100);
-            $table->text('description')->nullable();
-            $table->timestamp('created_at')->useCurrent();
-        });
-
-        // Tabel users - sesuai spesifikasi brief: user_id, username, password, email, created_at
+        // Core users table — spec-compliant: id, username, email, password, timestamps
         Schema::create('users', function (Blueprint $table) {
-            $table->id('user_id');
+            $table->id();                                        // BigIncrements 'id' per spec
             $table->string('username', 100)->unique();
             $table->string('email', 150)->unique();
             $table->string('password');
-            $table->unsignedBigInteger('role_id');
-            $table->boolean('is_active')->default(true);
+            $table->boolean('is_active')->default(true);         // Operational flag for account status
             $table->rememberToken();
-            $table->timestamp('created_at')->useCurrent();
-            $table->timestamp('updated_at')->nullable();
+            $table->timestamps();                                // created_at + updated_at per spec
 
-            $table->foreign('role_id')
-                  ->references('role_id')
-                  ->on('roles')
-                  ->onDelete('restrict');
-
-            $table->index('role_id');
             $table->index('is_active');
         });
 
@@ -66,6 +57,5 @@ return new class extends Migration
         Schema::dropIfExists('sessions');
         Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('users');
-        Schema::dropIfExists('roles');
     }
 };

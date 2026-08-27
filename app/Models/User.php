@@ -4,54 +4,56 @@ namespace App\Models;
 
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
+/**
+ * User Model — refactored for full Spatie/laravel-permission RBAC.
+ *
+ * Roles (super_admin, project_manager, member, viewer):
+ *   Managed entirely by Spatie. Use $user->assignRole(), $user->hasRole(),
+ *   $user->hasPermissionTo() for all role/permission checks.
+ *
+ * Primary Key: standard `id` (BigIncrements) per app_specification.md SSOT.
+ */
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, HasRoles, Notifiable;
 
     /**
-     * Primary key sesuai spesifikasi brief: user_id.
+     * Standard primary key ('id') per app_specification.md.
+     * Previous implementation used 'user_id' which conflicted with Spatie expectations.
      */
-    protected $primaryKey = 'user_id';
+    protected $primaryKey = 'id';
 
-    /**
-     * Aktifkan timestamps (created_at & updated_at).
-     * Diperlukan untuk tracking perubahan user data.
-     */
     public $timestamps = true;
 
     /**
-     * Kolom yang boleh diisi secara mass assignment.
+     * Mass-assignable columns.
+     * role_id removed — roles are now managed by Spatie pivot tables.
      */
     protected $fillable = [
         'username',
         'email',
         'password',
-        'role_id',
         'is_active',
     ];
 
-    /**
-     * Kolom yang disembunyikan saat serialization (JSON response).
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Type casting untuk kolom tertentu.
-     */
     protected function casts(): array
     {
         return [
-            'password' => 'hashed',
-            'is_active' => 'boolean',
+            'password'   => 'hashed',
+            'is_active'  => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -62,71 +64,55 @@ class User extends Authenticatable
     // =========================================================================
 
     /**
-     * Relasi: User belongs to satu Role.
+     * Projects where this user is the designated manager.
      */
-    public function role(): BelongsTo
+    public function managedProjects(): HasMany
     {
-        return $this->belongsTo(Role::class, 'role_id', 'role_id');
+        return $this->hasMany(Project::class, 'manager_id');
+    }
+
+    /**
+     * Projects where this user is a member (via project_user pivot).
+     */
+    public function memberProjects(): BelongsToMany
+    {
+        return $this->belongsToMany(Project::class, 'project_user', 'user_id', 'project_id');
     }
 
     // =========================================================================
-    // ROLE HELPER METHODS
-    // Digunakan di Policy, Gate, Middleware, dan Controller
+    // ROLE HELPER METHODS (delegated to Spatie)
     // =========================================================================
 
     /**
-     * Cek apakah user memiliki role tertentu.
-     */
-    public function hasRole(string $roleName): bool
-    {
-        return $this->role && $this->role->role_name === $roleName;
-    }
-
-    /**
-     * Cek apakah user memiliki salah satu dari role yang diberikan.
-     */
-    public function hasAnyRole(array $roleNames): bool
-    {
-        return $this->role && in_array($this->role->role_name, $roleNames);
-    }
-
-    /**
-     * Cek apakah user adalah Super Admin.
+     * Check if user is Super Admin.
+     * Uses Spatie's hasRole() under the hood.
      */
     public function isSuperAdmin(): bool
     {
-        return $this->hasRole(Role::SUPER_ADMIN);
+        return $this->hasRole('super_admin');
     }
 
     /**
-     * Cek apakah user adalah Project Manager.
+     * Check if user is a Project Manager.
      */
     public function isProjectManager(): bool
     {
-        return $this->hasRole(Role::PROJECT_MANAGER);
+        return $this->hasRole('project_manager');
     }
 
     /**
-     * Cek apakah user adalah Member.
+     * Check if user is a Member.
      */
     public function isMember(): bool
     {
-        return $this->hasRole(Role::MEMBER);
+        return $this->hasRole('member');
     }
 
     /**
-     * Cek apakah user adalah Client.
+     * Check if user is a Viewer / Client.
      */
-    public function isClient(): bool
+    public function isViewer(): bool
     {
-        return $this->hasRole(Role::CLIENT);
-    }
-
-    /**
-     * Mendapatkan nama role yang mudah dibaca.
-     */
-    public function getRoleDisplayNameAttribute(): string
-    {
-        return $this->role ? $this->role->display_name : 'Unknown';
+        return $this->hasRole('viewer');
     }
 }
