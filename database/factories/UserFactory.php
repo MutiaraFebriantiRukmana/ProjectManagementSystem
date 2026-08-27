@@ -1,0 +1,57 @@
+<?php
+
+namespace Database\Factories;
+
+use App\Models\Role;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+
+/**
+ * @extends Factory<User>
+ */
+class UserFactory extends Factory
+{
+    /**
+     * The current password being used by the factory.
+     */
+    protected static ?string $password;
+
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'username'       => fake()->unique()->userName(),
+            'email'          => fake()->unique()->safeEmail(),
+            'password'       => static::$password ??= Hash::make('password'),
+            'role_id'        => Role::where('role_name', Role::MEMBER)->first()?->role_id ?? 1,
+            'is_active'      => true,
+            'remember_token' => Str::random(10),
+        ];
+    }
+
+    /**
+     * Set role tertentu pada factory.
+     */
+    public function withRole(string $roleName): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role_id' => Role::where('role_name', $roleName)->first()->role_id,
+        ]);
+    }
+
+    /**
+     * Set user sebagai inactive.
+     */
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_active' => false,
+        ]);
+    }
+}
