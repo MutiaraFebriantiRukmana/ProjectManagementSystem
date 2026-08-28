@@ -4,21 +4,11 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-/**
- * StoreProjectRequest — Validates project creation input.
- *
- * Spec rule: NEVER write $request->validate() inside Controllers.
- * Authorization is handled here + in ProjectPolicy (double-check).
- */
 class StoreProjectRequest extends FormRequest
 {
-    /**
-     * Delegate authorization to ProjectPolicy via the controller's authorize() call.
-     * This FormRequest always returns true — policy check happens in the controller.
-     */
     public function authorize(): bool
     {
-        return true;
+        return true; // Otorisasi ditangani oleh Gate::authorize('create', Project::class) di controller
     }
 
     public function rules(): array
@@ -29,17 +19,18 @@ class StoreProjectRequest extends FormRequest
             'status'      => ['required', 'string', 'in:planning,active,on_hold,completed,cancelled'],
             'start_date'  => ['required', 'date'],
             'end_date'    => ['required', 'date', 'after_or_equal:start_date'],
+            'manager_id'  => ['required', 'integer', 'exists:users,id'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'name.required'             => 'Project name is required.',
-            'status.in'                 => 'Invalid project status. Allowed: planning, active, on_hold, completed, cancelled.',
-            'start_date.required'       => 'Start date is required.',
-            'end_date.required'         => 'End date (deadline) is required.',
-            'end_date.after_or_equal'   => 'End date must be on or after the start date.',
+            'name.required'           => 'Nama project wajib diisi.',
+            'status.in'               => 'Status project tidak valid.',
+            'end_date.after_or_equal' => 'Deadline project harus sama atau setelah tanggal mulai.',
+            'manager_id.required'     => 'Project Manager wajib dipilih.',
+            'manager_id.exists'       => 'User yang dipilih sebagai Manager tidak ditemukan.',
         ];
     }
 }

@@ -1,61 +1,80 @@
 @import "tailwindcss";
 
+@theme {
+  --color-surface-0: #0F111A;
+  --color-surface-1: rgba(22, 26, 40, 0.4);
+  --color-surface-2: rgba(30, 36, 54, 0.5);
+  --color-surface-3: rgba(40, 48, 70, 0.5);
+  
+  --color-border: rgba(255, 255, 255, 0.06);
+  --color-border-light: rgba(255, 255, 255, 0.1);
+  
+  --color-foreground: #E2E8F0;
+  --color-muted: #94A3B8;
+  --color-muted-foreground: #64748B;
+  
+  --color-primary: #FCA5C1;
+  --color-primary-dark: #f982a6;
+  --color-secondary: #91D1F2;
+  
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  
+  --color-super-admin: #ec4899;
+  --color-project-manager: #8b5cf6;
+  --color-member: #06b6d4;
+  --color-client: #10b981;
+}
+
 @layer base {
-  :root {
-    --surface-0: #0a0c10;
-    --surface-1: #12151c;
-    --surface-2: #1c212c;
-    --surface-3: #28303f;
-    --border: #262c3a;
-    --border-light: #363f52;
-    --foreground: #f3f4f6;
-    --muted: #9ca3af;
-    --muted-foreground: #6b7280;
-    --primary: #3b82f6;
-    --primary-dark: #1d4ed8;
-    --success: #10b981;
-    --warning: #f59e0b;
-    --error: #ef4444;
-    --super-admin: #ec4899;
-    --project-manager: #8b5cf6;
-    --member: #06b6d4;
-    --client: #10b981;
+  body {
+    @apply bg-surface-0 text-foreground;
+    background-image: 
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+    background-attachment: fixed;
+    /* transition timing for everything by default, though we'll specify cubic-bezier later */
   }
 }
 
-.bg-surface-0 { background-color: var(--surface-0); }
-.bg-surface-1 { background-color: var(--surface-1); }
-.bg-surface-2 { background-color: var(--surface-2); }
-.bg-surface-3 { background-color: var(--surface-3); }
-.border-border { border-color: var(--border); }
-.border-border-light { border-color: var(--border-light); }
-.text-foreground { color: var(--foreground); }
-.text-muted { color: var(--muted); }
-.text-muted-foreground { color: var(--muted-foreground); }
-.text-primary { color: var(--primary); }
-.text-super-admin { color: var(--super-admin); }
-.text-project-manager { color: var(--project-manager); }
-.text-member { color: var(--member); }
-.text-client { color: var(--client); }
-.text-error { color: var(--error); }
-.text-success { color: var(--success); }
-.text-warning { color: var(--warning); }
-
-.bg-super-admin\/10 { background-color: rgba(236, 72, 153, 0.1); }
-.border-super-admin\/20 { border-color: rgba(236, 72, 153, 0.2); }
-.border-super-admin { border-color: var(--super-admin); }
-.bg-project-manager\/10 { background-color: rgba(139, 92, 246, 0.1); }
-.border-project-manager\/20 { border-color: rgba(139, 92, 246, 0.2); }
-.border-project-manager { border-color: var(--project-manager); }
-.bg-member\/10 { background-color: rgba(6, 182, 212, 0.1); }
-.border-member\/20 { border-color: rgba(6, 182, 212, 0.2); }
-.border-member { border-color: var(--member); }
-.bg-client\/10 { background-color: rgba(16, 185, 129, 0.1); }
-.border-client\/20 { border-color: rgba(16, 185, 129, 0.2); }
-.border-client { border-color: var(--client); }
-
 .glass {
-  background: rgba(18, 21, 28, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
+  @apply bg-surface-1 backdrop-blur-2xl border border-white/5;
 }
+
+.glass-card {
+  @apply bg-surface-1 backdrop-blur-2xl border border-white/5 rounded-2xl transition-all duration-500;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  @apply border-white/10;
+  background-color: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 40px rgba(252, 165, 193, 0.05);
+}
+
+/* ─── Status Badges ─────────────────────────────────────────── */
+.badge-planning {
+  @apply bg-[#cbd5e1]/10 text-[#cbd5e1] border-[#cbd5e1]/20;
+}
+.badge-active {
+  @apply bg-secondary/10 text-secondary border-secondary/20;
+}
+.badge-on_hold {
+  @apply bg-warning/10 text-warning border-warning/20;
+}
+.badge-completed {
+  @apply bg-success/10 text-success border-success/20;
+}
+.badge-cancelled {
+  @apply bg-error/10 text-error border-error/20;
+}
+
+/* ─── Avatar stack ───────────────────────────────────────────── */
+.avatar-ring {
+  @apply border-2 border-surface-2;
+}
+
+/* ─── Deadline indicator ─────────────────────────────────────── */
+.deadline-ok    { @apply text-success; }
+.deadline-warn  { @apply text-warning; }
+.deadline-over  { @apply text-error; }
