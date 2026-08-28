@@ -50,7 +50,7 @@ class AuthController extends Controller
             $request->session()->regenerate();
         }
 
-        return redirect()->intended(route('projects.index'))->with('success', 'Login berhasil.');
+        return redirect()->intended(route('dashboard'))->with('success', 'Login berhasil.');
     }
 
     /**
@@ -86,7 +86,7 @@ class AuthController extends Controller
             $request->session()->regenerateToken();
         }
 
-        return redirect()->route('home')->with('success', 'Logout berhasil.');
+        return redirect()->route('login')->with('success', 'Logout berhasil.');
     }
 
     /**

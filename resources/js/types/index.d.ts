@@ -4,8 +4,6 @@ export interface User {
     email: string;
     roles: string[];
     permissions: string[];
-    created_at?: string;
-    is_active?: boolean;
 }
 
 export interface Project {
@@ -22,7 +20,7 @@ export interface Project {
 
 export type PageProps<T extends Record<string, unknown> = Record<string, unknown>> = T & {
     auth: {
-        user: User | null;
+        user: User;
     };
     flash: {
         success?: string;
