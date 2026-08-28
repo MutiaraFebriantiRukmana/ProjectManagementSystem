@@ -13,6 +13,17 @@ use App\Models\Label;
 use App\Models\TaskAttachment;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+/**
+ * @property int $id
+ * @property int $project_id
+ * @property int|null $parent_id
+ * @property int $reporter_id
+ * @property string $title
+ * @property string|null $description
+ * @property string $status
+ * @property string $priority
+ * @property float $position
+ */
 class Task extends Model
 {
     use HasFactory;
