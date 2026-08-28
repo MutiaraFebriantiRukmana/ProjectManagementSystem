@@ -7,19 +7,47 @@ import {
   Briefcase, 
   CheckCircle2, 
   Clock, 
-  TrendingUp,
-  FileText,
-  ShieldAlert,
-  FolderKanban,
-  KanbanSquare
+  TrendingUp, 
+  FileText, 
+  ShieldAlert, 
+  FolderKanban, 
+  KanbanSquare 
 } from 'lucide-react';
 
-export default function Dashboard() {
+interface Stats {
+  total_users?: number;
+  total_projects?: number;
+  active_projects?: number;
+  audit_logs_count?: number;
+  completed_tasks?: number;
+  pending_tasks?: number;
+  in_progress_tasks?: number;
+}
+
+interface DashboardProps {
+  stats?: Stats;
+}
+
+export default function Dashboard({ stats }: DashboardProps) {
   const { auth } = usePage<PageProps>().props;
   const user = auth.user;
   const role = user?.roles?.[0] || 'member';
 
-  const StatCard = ({ title, value, icon: Icon, description, trend, colorClass }: any) => (
+  const StatCard = ({
+    title,
+    value,
+    icon: Icon,
+    description,
+    trend,
+    colorClass,
+  }: {
+    title: string;
+    value: string | number;
+    icon: React.ElementType;
+    description: string;
+    trend?: string;
+    colorClass: string;
+  }) => (
     <div className="glass rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300">
       <div className="flex items-center justify-between">
         <div>
@@ -64,10 +92,34 @@ export default function Dashboard() {
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="Total Pengguna" value="4" icon={Users} description="User default aktif" trend="+100%" colorClass="text-super-admin border-super-admin/20 bg-super-admin/10" />
-            <StatCard title="Aktif Project" value="2" icon={Briefcase} description="Project berjalan" colorClass="text-primary border-primary/20 bg-primary/10" />
-            <StatCard title="Audit Logs" value="15" icon={FileText} description="Log terekam" colorClass="text-warning border-warning/20 bg-warning/10" />
-            <StatCard title="Sistem Status" value="99.9%" icon={CheckCircle2} description="Uptime server" colorClass="text-success border-success/20 bg-success/10" />
+            <StatCard
+              title="Total Pengguna"
+              value={stats?.total_users ?? 0}
+              icon={Users}
+              description="User terdaftar di database"
+              colorClass="text-super-admin border-super-admin/20 bg-super-admin/10"
+            />
+            <StatCard
+              title="Aktif Project"
+              value={stats?.active_projects ?? 0}
+              icon={Briefcase}
+              description="Project sedang berjalan"
+              colorClass="text-primary border-primary/20 bg-primary/10"
+            />
+            <StatCard
+              title="Total Project"
+              value={stats?.total_projects ?? 0}
+              icon={FolderKanban}
+              description="Keseluruhan project"
+              colorClass="text-warning border-warning/20 bg-warning/10"
+            />
+            <StatCard
+              title="Sistem Status"
+              value="Online"
+              icon={CheckCircle2}
+              description="Database & Server operasional"
+              colorClass="text-success border-success/20 bg-success/10"
+            />
           </div>
         </div>
       )}
@@ -90,39 +142,90 @@ export default function Dashboard() {
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="Project Diampu" value="3" icon={Briefcase} description="Project aktif Anda" colorClass="text-project-manager border-project-manager/20 bg-project-manager/10" />
-            <StatCard title="Total Anggota" value="8" icon={Users} description="Developer di tim" colorClass="text-primary border-primary/20 bg-primary/10" />
-            <StatCard title="Task Pending" value="5" icon={Clock} description="Menunggu approval" colorClass="text-warning border-warning/20 bg-warning/10" />
-            <StatCard title="Task Selesai" value="18" icon={CheckCircle2} description="Bulan ini" trend="+15%" colorClass="text-success border-success/20 bg-success/10" />
+            <StatCard
+              title="Project Aktif"
+              value={stats?.active_projects ?? 0}
+              icon={Briefcase}
+              description="Project aktif di bawah manajemen"
+              colorClass="text-project-manager border-project-manager/20 bg-project-manager/10"
+            />
+            <StatCard
+              title="Total Project"
+              value={stats?.total_projects ?? 0}
+              icon={FolderKanban}
+              description="Total project di sistem"
+              colorClass="text-primary border-primary/20 bg-primary/10"
+            />
+            <StatCard
+              title="Task Pending"
+              value={stats?.pending_tasks ?? 0}
+              icon={Clock}
+              description="Menunggu approval / review"
+              colorClass="text-warning border-warning/20 bg-warning/10"
+            />
+            <StatCard
+              title="Task Selesai"
+              value={stats?.completed_tasks ?? 0}
+              icon={CheckCircle2}
+              description="Task terverifikasi done"
+              colorClass="text-success border-success/20 bg-success/10"
+            />
           </div>
         </div>
       )}
 
       {/* Role: Member / Lainnya */}
-      {(role !== 'super_admin' && role !== 'Super Admin' && role !== 'project_manager' && role !== 'Project Manager') && (
-        <div className="space-y-8">
-          <div className="glass relative overflow-hidden rounded-2xl p-6 border-l-4 border-member">
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-member/10 border border-member/20 text-member">
-                <KanbanSquare className="h-6 w-6" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-foreground">Halo, Tim Member!</h2>
-                <p className="mt-1 text-sm text-muted">
-                  Lihat tugas yang diberikan kepada Anda, update status pengerjaan, dan submit task untuk review.
-                </p>
+      {role !== 'super_admin' &&
+        role !== 'Super Admin' &&
+        role !== 'project_manager' &&
+        role !== 'Project Manager' && (
+          <div className="space-y-8">
+            <div className="glass relative overflow-hidden rounded-2xl p-6 border-l-4 border-member">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-member/10 border border-member/20 text-member">
+                  <KanbanSquare className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">Halo, Tim Member!</h2>
+                  <p className="mt-1 text-sm text-muted">
+                    Lihat tugas yang diberikan kepada Anda, update status pengerjaan, dan submit task untuk review.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="Project Diikuti" value="2" icon={Briefcase} description="Project aktif" colorClass="text-member border-member/20 bg-member/10" />
-            <StatCard title="Task Saya" value="4" icon={Clock} description="Perlu dikerjakan" colorClass="text-warning border-warning/20 bg-warning/10" />
-            <StatCard title="In Progress" value="1" icon={TrendingUp} description="Sedang berjalan" colorClass="text-primary border-primary/20 bg-primary/10" />
-            <StatCard title="Selesai" value="9" icon={CheckCircle2} description="Tervalidasi" colorClass="text-success border-success/20 bg-success/10" />
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                title="Project Terdaftar"
+                value={stats?.total_projects ?? 0}
+                icon={Briefcase}
+                description="Project yang dapat Anda akses"
+                colorClass="text-member border-member/20 bg-member/10"
+              />
+              <StatCard
+                title="Task Saya"
+                value={stats?.pending_tasks ?? 0}
+                icon={Clock}
+                description="Task yang didelegasikan"
+                colorClass="text-warning border-warning/20 bg-warning/10"
+              />
+              <StatCard
+                title="In Progress"
+                value={stats?.in_progress_tasks ?? 0}
+                icon={TrendingUp}
+                description="Sedang dalam pengerjaan"
+                colorClass="text-primary border-primary/20 bg-primary/10"
+              />
+              <StatCard
+                title="Selesai"
+                value={stats?.completed_tasks ?? 0}
+                icon={CheckCircle2}
+                description="Task yang telah selesai"
+                colorClass="text-success border-success/20 bg-success/10"
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </AuthenticatedLayout>
   );
 }

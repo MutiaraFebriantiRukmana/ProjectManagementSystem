@@ -4,6 +4,8 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\ProjectController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Models\User;
+use App\Models\Project;
 
 // Public Routes
 Route::get('/', function () {
@@ -20,7 +22,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Dashboard
     Route::get('/dashboard', function () {
-        return Inertia::render('Dashboard');
+        return Inertia::render('Dashboard', [
+            'stats' => [
+                'total_users'     => User::count(),
+                'total_projects'  => Project::count(),
+                'active_projects' => Project::where('status', 'active')->count(),
+                'completed_tasks' => 0, // Siap menampung Task::where('status', 'done')->count() nanti
+                'pending_tasks'   => 0,
+                'in_progress_tasks' => 0,
+            ],
+        ]);
     })->name('dashboard');
 
     // Super Admin register user
