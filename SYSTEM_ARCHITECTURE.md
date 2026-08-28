@@ -310,3 +310,49 @@ Secara keseluruhan, sistem saat ini berada pada tahap **MVP fondasi: authenticat
 ## 9. Validasi yang Tersedia
 
 Perintah `php artisan test` terakhir berhasil dengan exit code `0` dan menghasilkan 15 test passed serta 86 assertions. Test yang ada memvalidasi login, akun nonaktif, profile access, pembatasan registrasi, dan authorization project termasuk skenario anti-IDOR. Belum ada test khusus untuk statistik dashboard atau page list project.
+
+## 10. Pembaruan Status Implementasi (2026-08-28)
+
+Bagian ini mencatat kondisi kode terbaru pada branch `feature/task`. Status ini menjadi rujukan ketika berbeda dengan target desain pada dokumen spesifikasi.
+
+### 10.1 Struktur dan route yang tersedia
+
+Aplikasi tetap berupa Laravel monolith dengan Inertia.js, React, TypeScript, dan session authentication. Backend kini memiliki `Task`, `Comment`, `Attachment`, `Approval`, `ActivityLog`, `TaskObserver`, `TaskPolicy`, dan `TaskService`. `routes/api.php` belum memiliki endpoint fungsional.
+
+Route task dan kolaborasi yang tersedia:
+
+```text
+POST   /tasks
+PATCH  /tasks/{task}/status
+DELETE /tasks/{task}
+POST   /tasks/{task}/comments
+DELETE /comments/{comment}
+POST   /tasks/{task}/attachments
+GET    /attachments/{attachment}/download
+```
+
+Belum tersedia route task index/show/edit, mutasi membership project, atau approval.
+
+### 10.2 Logika task yang sudah berjalan
+
+- `StoreTaskRequest` memvalidasi project, parent task, title, priority, status, tanggal, assignee, label, dan dependency.
+- Task baru ditempatkan pada `max(position) + 1000` untuk kolom statusnya.
+- `TaskService::updateStatus()` menolak status `done` jika dependency belum selesai dan mengembalikan judul dependency yang belum selesai.
+- `TaskService::updatePosition()` mendukung fractional Kanban position: `1000`, `next / 2`, `previous + 1000`, atau rata-rata dua posisi.
+- `TaskPolicy` mengatur akses view, create, update, status change, dan delete; Super Admin memiliki policy bypass.
+- `TaskObserver` mencatat `TASK_CREATED`, `TASK_UPDATED`, `TASK_STATUS_CHANGED`, dan `TASK_DELETED` ke `activity_logs`.
+
+### 10.3 Fitur parsial atau belum tersedia
+
+- Model dan migration task, assignee, label, subtask, dependency, comment, attachment, approval, dan activity log sudah ada, tetapi UI task/Kanban belum tersedia.
+- Approval baru memiliki schema/model; alur submit review, approve, reject, dan revision belum ada.
+- Comment dan attachment masih memakai validasi inline; `AttachmentPolicy` dan `StoreAttachmentRequest` belum ada. Attachment memakai disk `local`, bukan disk private yang ditargetkan.
+- Hanya `TaskObserver` yang terdaftar; `ProjectObserver` belum ada.
+- Statistik task dashboard masih placeholder `0` dan agregasi KPI belum memakai cache.
+- User management baru mendukung registrasi dan pemberian role oleh Super Admin; CRUD, status management, policy, dan UI admin belum ada.
+
+### 10.4 Test dan urutan pengembangan
+
+Test yang ada mencakup authentication, akun nonaktif, otorisasi registrasi, anti-IDOR project, otorisasi penghapusan project, dan aturan dependency task. Test terfokus untuk policy/endpoint task, posisi Kanban, keamanan comment/attachment, approval, observer, dashboard, dan user management masih diperlukan.
+
+Urutan prioritas berikutnya adalah menyelesaikan UI task/Kanban dan project list, user management Super Admin, Form Request dan AttachmentPolicy, approval dan ProjectObserver, test endpoint/otorisasi, agregasi dashboard dengan `Cache::remember()`, lalu queue dan notifikasi.
