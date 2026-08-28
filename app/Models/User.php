@@ -115,4 +115,14 @@ class User extends Authenticatable
     {
         return $this->hasRole('viewer');
     }
+
+    public function assignedTasks(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Task::class, 'task_user');
+    }
+
+    public function reportedTasks(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Task::class, 'reporter_id');
+    }
 }

@@ -29,6 +29,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Projects CRUD (resource routes: index, create, store, show, edit, update, destroy)
     Route::resource('projects', ProjectController::class);
 
+    // --- Tasks & Kanban ---
+    Route::post('/tasks', [\App\Http\Controllers\TaskController::class, 'store'])->name('tasks.store');
+    Route::patch('/tasks/{task}/status', [\App\Http\Controllers\TaskController::class, 'updateStatus'])->name('tasks.update-status');
+    Route::delete('/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'destroy'])->name('tasks.destroy');
+
+    // --- Comments ---
+    Route::post('/tasks/{task}/comments', [\App\Http\Controllers\CommentController::class, 'store'])->name('comments.store');
+    Route::delete('/comments/{comment}', [\App\Http\Controllers\CommentController::class, 'destroy'])->name('comments.destroy');
+
+    // --- Attachments (Secure Upload & Download) ---
+    Route::post('/tasks/{task}/attachments', [\App\Http\Controllers\AttachmentController::class, 'store'])->name('attachments.store');
+    Route::get('/attachments/{attachment}/download', [\App\Http\Controllers\AttachmentController::class, 'download'])->name('attachments.download');
     // Project Member Management
     Route::post('/projects/{project}/members', [ProjectController::class, 'addMember'])
         ->name('projects.members.add');
