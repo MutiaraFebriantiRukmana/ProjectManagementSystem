@@ -24,6 +24,7 @@ class UpdateProjectRequest extends FormRequest
             'status'      => ['sometimes', 'string', 'in:planning,active,on_hold,completed,cancelled'],
             'start_date'  => ['sometimes', 'date'],
             'end_date'    => ['sometimes', 'date', 'after_or_equal:start_date'],
+            'manager_id'  => ['sometimes', 'integer', 'exists:users,id'],
         ];
     }
 
@@ -32,6 +33,7 @@ class UpdateProjectRequest extends FormRequest
         return [
             'status.in'               => 'Invalid project status. Allowed: planning, active, on_hold, completed, cancelled.',
             'end_date.after_or_equal' => 'End date must be on or after the start date.',
+            'manager_id.exists'       => 'User yang dipilih sebagai Manager tidak ditemukan.',
         ];
     }
 }

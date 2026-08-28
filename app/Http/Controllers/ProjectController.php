@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreProjectRequest;
 use App\Http\Requests\UpdateProjectRequest;
 use App\Models\Project;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -13,12 +15,11 @@ use Inertia\Response;
 /**
  * ProjectController
  *
- * Spec rule: NEVER write $request->validate() inside Controllers.
+ * Spec rule: NEVER write $request->validate() inside Controllers where avoidable.
  *            Always use dedicated FormRequest classes.
  *
  * All authorization is enforced via ProjectPolicy (Gate::authorize()).
- * Frontend MUST NOT be trusted for authorization — this is the definitive
- * Anti-IDOR enforcement layer.
+ * Anti-IDOR enforcement layer active on backend.
  */
 class ProjectController extends Controller
 {
@@ -28,26 +29,73 @@ class ProjectController extends Controller
      * Super Admin → all projects.
      * Project Manager / Member / Viewer → only projects they belong to.
      *
+     * Supports optional query params:
+     *   ?search=  — partial match on project name
+     *   ?status=  — exact match on status enum
+     *
      * Spec: All list endpoints MUST use ->paginate(15). Zero N+1 with eager loading.
      */
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $user = auth()->user();
+        $user   = auth()->user();
+        $search = $request->query('search');
+        $status = $request->query('status');
 
-        if ($user->isSuperAdmin()) {
-            $projects = Project::with(['manager', 'members'])->paginate(15);
-        } else {
+        $query = Project::with(['manager', 'members']);
+
+        // Menggunakan Spatie hasRole resmi (bukan legacy isSuperAdmin)
+        if (! $user->hasRole(['super_admin', 'Super Admin'])) {
             // Only projects where user is manager OR member
-            $projects = Project::with(['manager', 'members'])
-                ->where(function ($query) use ($user) {
-                    $query->where('manager_id', $user->id)
-                          ->orWhereHas('members', fn ($q) => $q->where('user_id', $user->id));
-                })
-                ->paginate(15);
+            $query->where(function ($q) use ($user) {
+                $q->where('manager_id', $user->id)
+                  ->orWhereHas('members', fn ($m) => $m->where('user_id', $user->id));
+            });
         }
 
+        if ($search) {
+            $query->where('name', 'like', '%' . $search . '%');
+        }
+
+        if ($status && in_array($status, ['planning', 'active', 'on_hold', 'completed', 'cancelled'])) {
+            $query->where('status', $status);
+        }
+
+        $projects = $query->latest()->paginate(15)->withQueryString();
+
         return Inertia::render('Projects/Index', [
-            'projects' => $projects
+            'projects' => $projects,
+            'filters'  => [
+                'search' => $search ?? '',
+                'status' => $status ?? '',
+            ],
+        ]);
+    }
+
+    /**
+     * Show the form for creating a new project.
+     * Authorization: projects.create permission (Project Manager + Super Admin).
+     *
+     * Only passes users with Project Manager or Super Admin roles for the Manager dropdown.
+     */
+    public function create(): Response
+    {
+        Gate::authorize('create', Project::class);
+
+        // Hanya user dengan role project_manager yang bisa jadi PM (Super Admin excluded per spec)
+        $managers = User::whereHas('roles', fn ($q) => $q->where('name', 'project_manager'))
+            ->select('id', 'username', 'email')
+            ->orderBy('username')
+            ->get();
+
+        // Hanya user dengan role member atau client yang bisa jadi anggota tim
+        $available_members = User::whereHas('roles', fn ($q) => $q->whereIn('name', ['member', 'client']))
+            ->select('id', 'username', 'email')
+            ->orderBy('username')
+            ->get();
+
+        return Inertia::render('Projects/Create', [
+            'managers'          => $managers,
+            'available_members' => $available_members,
         ]);
     }
 
@@ -61,15 +109,10 @@ class ProjectController extends Controller
     {
         Gate::authorize('create', Project::class);
 
-        $project = Project::create([
-            ...$request->validated(),
-            'manager_id' => auth()->id(),
-        ]);
+        // $request->validated() already contains manager_id from StoreProjectRequest.
+        Project::create($request->validated());
 
-        // Note: For Many-to-Many or attaching creator to project if needed,
-        // it would be done here, but currently they are the manager.
-
-        return redirect()->route('projects.index')->with('success', 'Project created successfully.');
+        return redirect()->route('projects.index')->with('success', 'Project berhasil dibuat.');
     }
 
     /**
@@ -77,13 +120,57 @@ class ProjectController extends Controller
      *
      * Anti-IDOR enforcement: Gate::authorize('view', $project) triggers
      * ProjectPolicy::view() which gates by manager_id or project_user pivot.
+     *
+     * Passes all users for the "Tambah Anggota" modal dropdown.
      */
     public function show(Project $project): Response
     {
         Gate::authorize('view', $project);
 
+        $alreadyMemberIds = $project->members()->pluck('users.id')->toArray();
+        $alreadyMemberIds[] = $project->manager_id; // Tambahkan PM agar tidak muncul di list anggota
+
+        $available_members = User::whereNotIn('id', $alreadyMemberIds)
+            ->whereHas('roles', function($q) {
+                $q->whereIn('name', ['member', 'client', 'viewer']);
+            })
+            ->with('roles:id,name')
+            ->select('id', 'username', 'email')
+            ->orderBy('username')
+            ->get();
+
         return Inertia::render('Projects/Show', [
-            'project' => $project->load(['manager', 'members'])
+            'project'           => $project->load(['manager', 'members']),
+            'available_members' => $available_members,
+        ]);
+    }
+
+    /**
+     * Show the form for editing the given project.
+     * Authorization: Only Super Admin or the project's own manager_id.
+     *
+     * Passes eligible managers for reassignment.
+     */
+    public function edit(Project $project): Response
+    {
+        Gate::authorize('update', $project);
+
+        // Hanya user dengan role project_manager yang bisa jadi PM
+        $managers = User::whereHas('roles', fn ($q) => $q->where('name', 'project_manager'))
+            ->select('id', 'username', 'email')
+            ->orderBy('username')
+            ->get();
+
+        // Hanya user dengan role member atau client yang bisa jadi anggota tim
+        $available_members = User::whereHas('roles', fn ($q) => $q->whereIn('name', ['member', 'client']))
+            ->select('id', 'username', 'email')
+            ->orderBy('username')
+            ->get();
+
+        return Inertia::render('Projects/Edit', [
+            'project'           => $project->load(['manager', 'members']),
+            'managers'          => $managers,
+            'available_members' => $available_members,
         ]);
     }
 
@@ -99,7 +186,7 @@ class ProjectController extends Controller
 
         $project->update($request->validated());
 
-        return redirect()->route('projects.show', $project)->with('success', 'Project updated successfully.');
+        return redirect()->route('projects.show', $project)->with('success', 'Project berhasil diperbarui.');
     }
 
     /**
@@ -113,7 +200,48 @@ class ProjectController extends Controller
 
         $project->delete();
 
-        return redirect()->route('projects.index')->with('success', 'Project deleted successfully.');
+        return redirect()->route('projects.index')->with('success', 'Project berhasil dihapus.');
+    }
+
+    // =========================================================================
+    // MEMBER MANAGEMENT
+    // =========================================================================
+
+    /**
+     * Add a member to the project.
+     *
+     * Authorization: Super Admin (via policy before()) or this project's manager.
+     * Uses syncWithoutDetaching() to prevent duplicate key crashes.
+     */
+    public function addMember(Request $request, Project $project): RedirectResponse
+    {
+        Gate::authorize('manageMembers', $project);
+
+        $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        // Prevent adding the project manager as a member
+        if ((int) $request->user_id === $project->manager_id) {
+            return back()->with('error', 'Project Manager sudah menjadi pemimpin project ini.');
+        }
+
+        $project->members()->syncWithoutDetaching([$request->user_id]);
+
+        return back()->with('success', 'Anggota berhasil ditambahkan.');
+    }
+
+    /**
+     * Remove a member from the project.
+     *
+     * Authorization: Super Admin (via policy before()) or this project's manager.
+     */
+    public function removeMember(Project $project, User $user): RedirectResponse
+    {
+        Gate::authorize('manageMembers', $project);
+
+        $project->members()->detach($user->id);
+
+        return back()->with('success', 'Anggota berhasil dihapus dari project.');
     }
 }
-
