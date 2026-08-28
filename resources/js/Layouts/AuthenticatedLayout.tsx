@@ -52,7 +52,11 @@ export default function AuthenticatedLayout({
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface-0">
+    <div className="flex h-screen overflow-hidden bg-surface-0 relative">
+      {/* ── Atmospheric Glows ── */}
+      <div className="pointer-events-none fixed -top-40 -right-40 h-[500px] w-[500px] rounded-full bg-primary opacity-[0.06] blur-[150px] z-0" />
+      <div className="pointer-events-none fixed -bottom-40 -left-40 h-[500px] w-[500px] rounded-full bg-secondary opacity-[0.06] blur-[150px] z-0" />
+
       {/* Mobile Overlay */}
       {sidebarOpen && (
         <div 
@@ -97,20 +101,20 @@ export default function AuthenticatedLayout({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1.5 p-4 overflow-y-auto">
-          <Link href="/dashboard" className="flex items-center gap-3 rounded-xl bg-primary/10 px-4 py-3 text-sm font-medium text-primary">
-            <LayoutDashboard className="h-5 w-5" />
+        <nav className="flex-1 space-y-1.5 p-4 overflow-y-auto relative z-10">
+          <Link href="/dashboard" className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-primary/15 to-transparent border-l-2 border-primary px-4 py-3 text-sm font-medium text-foreground">
+            <LayoutDashboard className="h-5 w-5 text-secondary" />
             <span>Dashboard</span>
           </Link>
 
-          <Link href="/projects" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted hover:bg-surface-2 hover:text-foreground transition-colors">
-            <Briefcase className="h-5 w-5" />
+          <Link href="/projects" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent hover:text-foreground transition-all">
+            <Briefcase className="h-5 w-5 hover:text-secondary transition-colors" />
             <span>Project Management</span>
           </Link>
 
           {(currentRole === 'super_admin' || currentRole === 'Super Admin') && (
-            <a href="#" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted hover:bg-surface-2 hover:text-foreground transition-colors">
-              <Users className="h-5 w-5" />
+            <a href="#" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent hover:text-foreground transition-all">
+              <Users className="h-5 w-5 hover:text-secondary transition-colors" />
               <span>Kelola User & Role</span>
             </a>
           )}

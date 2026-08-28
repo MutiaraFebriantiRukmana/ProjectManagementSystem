@@ -14,16 +14,11 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * ProjectController — Unified Version (Project UI + Member Management + Task Engine)
- *
- * All authorization is enforced via ProjectPolicy (Gate::authorize()).
- * Anti-IDOR enforcement layer active on backend.
+ * ProjectController — Unified Version
+ * Menggabungkan UI Project Temanmu + Task Backend & Eager Loading Buatanmu.
  */
 class ProjectController extends Controller
 {
-    /**
-     * 1. LIST PROJECTS (Dengan Search, Status Filter & Pagination)
-     */
     public function index(Request $request): Response
     {
         /** @var User $user */
@@ -33,7 +28,6 @@ class ProjectController extends Controller
 
         $query = Project::with(['manager', 'members']);
 
-        // Super Admin melihat semua, PM/Member hanya melihat project terkait
         if (! $user->hasRole('super_admin')) {
             $query->where(function ($q) use ($user) {
                 $q->where('manager_id', $user->id)
@@ -60,26 +54,26 @@ class ProjectController extends Controller
         ]);
     }
 
-    /**
-     * 2. FORM CREATE PROJECT (Dropdown Manager khusus PM & Super Admin)
-     */
     public function create(): Response
     {
         Gate::authorize('create', Project::class);
 
-        $managers = User::role(['project_manager', 'super_admin'])
+        $managers = User::whereHas('roles', fn ($q) => $q->where('name', 'project_manager'))
+            ->select('id', 'username', 'email')
+            ->orderBy('username')
+            ->get();
+
+        $available_members = User::whereHas('roles', fn ($q) => $q->whereIn('name', ['member', 'client']))
             ->select('id', 'username', 'email')
             ->orderBy('username')
             ->get();
 
         return Inertia::render('Projects/Create', [
-            'managers' => $managers,
+            'managers'          => $managers,
+            'available_members' => $available_members,
         ]);
     }
 
-    /**
-     * 3. STORE PROJECT
-     */
     public function store(StoreProjectRequest $request): RedirectResponse
     {
         Gate::authorize('create', Project::class);
@@ -89,12 +83,21 @@ class ProjectController extends Controller
         return redirect()->route('projects.index')->with('success', 'Project berhasil dibuat.');
     }
 
-    /**
-     * 4. DETAIL PROJECT & KANBAN (Eager Loading Task Lengkap + Data Member)
-     */
     public function show(Project $project): Response
     {
         Gate::authorize('view', $project);
+
+        $alreadyMemberIds = $project->members()->pluck('users.id')->toArray();
+        $alreadyMemberIds[] = $project->manager_id;
+
+        $available_members = User::whereNotIn('id', $alreadyMemberIds)
+            ->whereHas('roles', function($q) {
+                $q->whereIn('name', ['member', 'client', 'viewer']);
+            })
+            ->with('roles:id,name')
+            ->select('id', 'username', 'email')
+            ->orderBy('username')
+            ->get();
 
         return Inertia::render('Projects/Show', [
             'project' => $project->load([
@@ -107,32 +110,32 @@ class ProjectController extends Controller
                 'tasks.attachments', 
                 'tasks.comments.user'
             ]),
-            'users'  => User::select('id', 'username', 'email')->orderBy('username')->get(),
-            'labels' => Label::all(),
+            'available_members' => $available_members,
+            'labels'            => Label::all(),
         ]);
     }
 
-    /**
-     * 5. FORM EDIT PROJECT
-     */
     public function edit(Project $project): Response
     {
         Gate::authorize('update', $project);
 
-        $managers = User::role(['project_manager', 'super_admin'])
+        $managers = User::whereHas('roles', fn ($q) => $q->where('name', 'project_manager'))
+            ->select('id', 'username', 'email')
+            ->orderBy('username')
+            ->get();
+
+        $available_members = User::whereHas('roles', fn ($q) => $q->whereIn('name', ['member', 'client']))
             ->select('id', 'username', 'email')
             ->orderBy('username')
             ->get();
 
         return Inertia::render('Projects/Edit', [
-            'project'  => $project->load(['manager', 'members']),
-            'managers' => $managers,
+            'project'           => $project->load(['manager', 'members']),
+            'managers'          => $managers,
+            'available_members' => $available_members,
         ]);
     }
 
-    /**
-     * 6. UPDATE PROJECT
-     */
     public function update(UpdateProjectRequest $request, Project $project): RedirectResponse
     {
         Gate::authorize('update', $project);
@@ -142,9 +145,6 @@ class ProjectController extends Controller
         return redirect()->route('projects.show', $project)->with('success', 'Project berhasil diperbarui.');
     }
 
-    /**
-     * 7. DELETE PROJECT (Super Admin Only)
-     */
     public function destroy(Project $project): RedirectResponse
     {
         Gate::authorize('delete', $project);
@@ -154,13 +154,6 @@ class ProjectController extends Controller
         return redirect()->route('projects.index')->with('success', 'Project berhasil dihapus.');
     }
 
-    // =========================================================================
-    // MEMBER MANAGEMENT (Fitur Poin 6 Brief)
-    // =========================================================================
-
-    /**
-     * 8. TAMBAH MEMBER PROJECT
-     */
     public function addMember(Request $request, Project $project): RedirectResponse
     {
         Gate::authorize('manageMembers', $project);
@@ -178,9 +171,6 @@ class ProjectController extends Controller
         return back()->with('success', 'Anggota berhasil ditambahkan.');
     }
 
-    /**
-     * 9. HAPUS MEMBER PROJECT
-     */
     public function removeMember(Project $project, User $user): RedirectResponse
     {
         Gate::authorize('manageMembers', $project);
