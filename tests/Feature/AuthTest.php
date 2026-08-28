@@ -51,7 +51,7 @@ class AuthTest extends TestCase
                 'password' => 'password', // Default factory password
             ]);
 
-            $response->assertRedirect(route('projects.index'));
+            $response->assertRedirect(route('dashboard'));
             $response->assertSessionHas('success', 'Login berhasil.');
             $this->assertAuthenticatedAs($user);
 
@@ -113,7 +113,7 @@ class AuthTest extends TestCase
 
         $authResponse->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('Auth/Profile')
+                ->component('Auth/Profile', false)
                 ->has('user')
             );
     }
