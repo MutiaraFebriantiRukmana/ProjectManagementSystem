@@ -27,8 +27,7 @@ ProjectManagementSystem/
 │   │   │   ├── Controller.php
 │   │   │   └── ProjectController.php
 │   │   ├── Middleware/
-│   │   │   ├── HandleInertiaRequests.php
-│   │   │   └── RoleMiddleware.php
+│   │   │   └── HandleInertiaRequests.php
 │   │   └── Requests/
 │   │       ├── Auth/LoginRequest.php
 │   │       ├── Auth/RegisterRequest.php
@@ -36,7 +35,6 @@ ProjectManagementSystem/
 │   │       └── UpdateProjectRequest.php
 │   ├── Models/
 │   │   ├── Project.php
-│   │   ├── Role.php
 │   │   └── User.php
 │   ├── Policies/ProjectPolicy.php
 │   └── Providers/AppServiceProvider.php
@@ -66,9 +64,9 @@ ProjectManagementSystem/
 │   │   ├── bootstrap.ts
 │   │   ├── Layouts/AuthenticatedLayout.tsx
 │   │   ├── Pages/
-│   │   │   ├── Auth/Login.tsx
+│   │   │   ├── Auth/{Login,Profile}.tsx
 │   │   │   ├── Dashboard.tsx
-│   │   │   └── Projects/{Profile,Show}.tsx
+│   │   │   └── Projects/Show.tsx
 │   │   └── types/index.d.ts
 │   └── views/app.blade.php
 ├── routes/web.php
@@ -135,7 +133,7 @@ Struktur target adalah rekomendasi organisasi kode; folder tersebut belum seluru
 ```mermaid
 flowchart LR
     Browser --> Web[Laravel routes/web.php]
-    Web --> Middleware[auth, verified, role]
+    Web --> Middleware[auth, verified, Spatie role]
     Middleware --> Controller[Controller atau closure]
     Controller --> Policy[Gate / ProjectPolicy]
     Policy --> Inertia[Inertia::render]
@@ -220,12 +218,13 @@ Aturan akses project yang sudah diterapkan:
 - Logout menghapus session dan meregenerasi CSRF token.
 - Password memakai hashing otomatis dari model cast.
 - Route terlindungi menggunakan middleware `auth` dan `verified`.
+- Registrasi dibatasi oleh middleware role Spatie pada route `role:super_admin|Super Admin`.
 
 ### RBAC
 
-Spatie mengelola role dan permission melalui tabel `roles`, `permissions`, `model_has_roles`, `model_has_permissions`, dan `role_has_permissions`. Role yang diseed: `super_admin`, `project_manager`, `member`, dan `viewer`.
+Spatie mengelola role dan permission melalui tabel `roles`, `permissions`, `model_has_roles`, `model_has_permissions`, dan `role_has_permissions`. Role yang diseed: `super_admin`, `project_manager`, `member`, dan `viewer`. Model role custom dan middleware role lokal sudah dihapus; Spatie menjadi satu-satunya sumber RBAC.
 
-Permission yang sudah didefinisikan mencakup user, project, task, attachment, comment, dan activity log. Sebagian permission task/attachment/comment belum memiliki fitur pemakai di controller maupun route.
+Permission yang sudah didefinisikan mencakup user, project, task, attachment, comment, dan audit log. Sebagian permission task/attachment/comment/audit log belum memiliki fitur pemakai di controller maupun route.
 
 ### Project
 
@@ -253,7 +252,7 @@ Berdasarkan `app_specification.md` dan `brief.md`, area berikut masih berupa tar
 - Activity log dan observer untuk perubahan Project/Task.
 - Notifications database dan deadline alert.
 - Queue untuk email, mention, dan alert.
-- Cache untuk KPI dashboard.
+- Cache untuk KPI dashboard. Dashboard sudah menerima sebagian KPI dari database, tetapi belum menggunakan `Cache::remember()`.
 - Admin UI untuk user, role, permission, dan audit log.
 - REST API yang konsisten. Saat ini `routes/api.php` belum memiliki endpoint.
 
@@ -269,7 +268,7 @@ Berdasarkan `app_specification.md` dan `brief.md`, area berikut masih berupa tar
 | Registrasi user oleh Super Admin | Selesai backend | Route role-protected dan test tersedia; belum ada halaman admin |
 | RBAC Spatie | Selesai backend | Seeder role/permission dan `User::HasRoles` |
 | Share user, role, permission ke Inertia | Selesai | `HandleInertiaRequests` |
-| Dashboard | Prototype | Tampilan ada, tetapi angka KPI masih hard-coded |
+| Dashboard | Implementasi awal | Statistik user, total project, dan active project sudah dihitung dari database; KPI task masih bernilai `0` karena modul task belum ada; status sistem masih label `Online` |
 | Create project | Selesai backend | Request, policy, controller, model, migration |
 | List project | Backend tersedia, frontend belum lengkap | Controller merender `Projects/Index`, tetapi page tersebut belum ada di workspace |
 | Detail project | Selesai minimal | Policy, controller, page `Projects/Show`; UI baru menampilkan nama |
@@ -286,30 +285,28 @@ Berdasarkan `app_specification.md` dan `brief.md`, area berikut masih berupa tar
 | REST API | Belum dimulai | `routes/api.php` kosong secara fungsional |
 | Automated tests | Fondasi tersedia | Test auth dan authorization project ada; cakupan fitur inti lainnya belum ada |
 
-Secara keseluruhan, sistem saat ini berada pada tahap **MVP fondasi: authentication + RBAC + project authorization/CRUD backend**, belum pada tahap fitur penuh Project Management System.
+Secara keseluruhan, sistem saat ini berada pada tahap **MVP fondasi: authentication + RBAC + dashboard KPI dasar + project authorization/CRUD backend**, belum pada tahap fitur penuh Project Management System.
 
 ## 7. Temuan Teknis yang Perlu Diperhatikan
 
 1. `ProjectController::index()` merender `Projects/Index`, tetapi file page tersebut belum tersedia. Akses `GET /projects` berpotensi gagal saat resolver Inertia mencari komponen itu.
-2. `AuthController::me()` merender `Auth/Profile`, sedangkan page yang terlihat berada di `resources/js/Pages/Projects/Profile.tsx`. Nama komponen tidak konsisten; test saat ini sengaja tidak memvalidasi keberadaan page (`component('Auth/Profile', false)`).
-3. `RoleMiddleware` masih mencoba memuat relasi `role` dan membaca `role_name`, sedangkan `User` sudah sepenuhnya memakai Spatie `HasRoles`. Route register menggunakan middleware role bawaan Spatie, sehingga middleware custom ini tampaknya legacy dan perlu diselaraskan atau dihapus.
-4. Nama permission di seeder belum sepenuhnya sama dengan spesifikasi. Contohnya implementasi memakai `tasks.update_status`, `users.manage_roles`, dan `activity_logs.view`, sedangkan spesifikasi menyebut `tasks.change_status`, `roles.manage`, dan `audit_logs.view`.
-5. `Role.php` masih ada, tetapi role aktif dikelola oleh model role Spatie. Perannya perlu dipastikan agar tidak menimbulkan dua sumber kebenaran.
-6. Dashboard menampilkan nilai contoh seperti `4`, `2`, dan `99.9%`; nilai tersebut belum berasal dari query database atau monitoring aktual.
-7. `composer.json` menetapkan PHP `^8.2`, sementara spesifikasi menargetkan PHP 8.3+. Constraint deployment dan dokumentasi perlu disepakati.
+2. Dashboard sudah memakai query database untuk `total_users`, `total_projects`, dan `active_projects`, tetapi route masih berupa closure dan belum dipindahkan ke controller/service khusus. `completed_tasks`, `pending_tasks`, dan `in_progress_tasks` masih `0` sebagai placeholder.
+3. Dashboard belum menggunakan `Cache::remember()` meskipun spesifikasi mewajibkan cache untuk agregasi KPI.
+4. Nama permission pada seeder kini sudah diselaraskan ke spesifikasi utama, termasuk `tasks.change_status`, `roles.manage`, dan `audit_logs.view`. Namun fitur yang menggunakan permission tersebut belum seluruhnya tersedia.
+5. `composer.json` menetapkan PHP `^8.2`, sementara spesifikasi menargetkan PHP 8.3+. Constraint deployment dan dokumentasi perlu disepakati.
 
 ## 8. Urutan Pengembangan yang Disarankan
 
-1. Lengkapi page `Projects/Index`, rapikan penamaan `Auth/Profile`, dan verifikasi build frontend.
-2. Selaraskan middleware legacy dan seluruh nama permission dengan satu matriks RBAC resmi.
+1. Lengkapi page `Projects/Index` dan UI CRUD project, lalu verifikasi build frontend.
+2. Pindahkan logika statistik dashboard ke controller/service dan tambahkan `Cache::remember()` setelah modul task tersedia.
 3. Implementasikan membership management dengan policy `manageMembers` dan test anti-IDOR.
 4. Tambahkan resource Task beserta enum status/priority, assignee, Form Request, Policy, dan test.
 5. Tambahkan dependency validation, approval workflow, dan Kanban reorder.
 6. Tambahkan comment, attachment private storage, download authorization, dan notification.
-7. Implementasikan activity log observer, queue, serta cache KPI dashboard.
+7. Implementasikan activity log observer dan queue untuk pekerjaan asynchronous.
 8. Tambahkan halaman frontend per role dan feature test untuk setiap aturan akses.
 9. Bila REST API memang wajib, tentukan kontrak API lalu buat controller/resource di `routes/api.php`; jangan mencampur response JSON dan Inertia tanpa boundary yang jelas.
 
 ## 9. Validasi yang Tersedia
 
-Perintah `php artisan test` terakhir berhasil dengan exit code `0`. Test yang ada memvalidasi login, akun nonaktif, profile access, pembatasan registrasi, dan authorization project termasuk skenario anti-IDOR.
+Perintah `php artisan test` terakhir berhasil dengan exit code `0` dan menghasilkan 15 test passed serta 86 assertions. Test yang ada memvalidasi login, akun nonaktif, profile access, pembatasan registrasi, dan authorization project termasuk skenario anti-IDOR. Belum ada test khusus untuk statistik dashboard atau page list project.
