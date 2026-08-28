@@ -118,7 +118,7 @@ function ProjectCard({
   const maxAvatars = 3;
 
   return (
-    <div className="glass-card p-6 flex flex-col gap-4 hover:border-border-light transition-all duration-300 group relative">
+    <div className="glass-card p-8 flex flex-col gap-4 hover:border-border-light transition-all duration-300 group relative">
       {/* Top row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -550,7 +550,7 @@ function DeleteModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="glass-card p-6 w-full max-w-md shadow-2xl">
+      <div className="glass-card p-8 w-full max-w-md shadow-2xl">
         <div className="flex items-center gap-4 mb-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-error/10 border border-error/20">
             <Trash2 className="h-6 w-6 text-error" />

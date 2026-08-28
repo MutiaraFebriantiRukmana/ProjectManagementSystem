@@ -54,8 +54,8 @@ export default function AuthenticatedLayout({
   return (
     <div className="flex h-screen overflow-hidden bg-surface-0 relative">
       {/* ── Atmospheric Glows ── */}
-      <div className="pointer-events-none fixed -top-40 -right-40 h-[500px] w-[500px] rounded-full bg-primary opacity-15 blur-[120px] z-0" />
-      <div className="pointer-events-none fixed -bottom-40 -left-40 h-[500px] w-[500px] rounded-full bg-secondary opacity-15 blur-[120px] z-0" />
+      <div className="pointer-events-none fixed -top-40 -right-40 h-[500px] w-[500px] rounded-full bg-primary opacity-[0.06] blur-[150px] z-0" />
+      <div className="pointer-events-none fixed -bottom-40 -left-40 h-[500px] w-[500px] rounded-full bg-secondary opacity-[0.06] blur-[150px] z-0" />
 
       {/* Mobile Overlay */}
       {sidebarOpen && (

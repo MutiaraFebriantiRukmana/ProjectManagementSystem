@@ -107,7 +107,7 @@ export default function Create({ managers, available_members }: CreateProps) {
         </nav>
 
         {/* Form Card */}
-        <div className="glass-card p-6 shadow-xl">
+        <div className="glass-card p-8 shadow-xl">
           {/* Card header */}
           <div className="flex items-center gap-3 mb-6 pb-5 border-b border-border">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">

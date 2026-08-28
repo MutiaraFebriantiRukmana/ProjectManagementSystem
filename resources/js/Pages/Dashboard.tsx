@@ -93,7 +93,7 @@ function StatCard({
   colorClass: string;
 }) {
   return (
-    <div className="glass-card p-6 shadow-sm">
+    <div className="glass-card p-8 shadow-sm">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-muted">{title}</p>
@@ -290,7 +290,7 @@ export default function Dashboard({ stats, projects = [], filters = { status: ''
       {/* ── Super Admin ──────────────────────────────────────────────── */}
       {isSuperAdmin && (
         <div className="space-y-8">
-          <div className="glass-card p-6 border-l-4 border-super-admin">
+          <div className="glass-card p-8 border-l-4 border-super-admin">
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-super-admin/10 border border-super-admin/20 text-super-admin">
                 <ShieldAlert className="h-6 w-6" />
@@ -340,7 +340,7 @@ export default function Dashboard({ stats, projects = [], filters = { status: ''
       {/* ── Project Manager ──────────────────────────────────────────── */}
       {isProjectMgr && (
         <div className="space-y-8">
-          <div className="glass-card p-6 border-l-4 border-project-manager">
+          <div className="glass-card p-8 border-l-4 border-project-manager">
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-project-manager/10 border border-project-manager/20 text-project-manager">
                 <FolderKanban className="h-6 w-6" />
@@ -397,7 +397,7 @@ export default function Dashboard({ stats, projects = [], filters = { status: ''
       {/* ── Member ───────────────────────────────────────────────────── */}
       {isMember && (
         <div className="space-y-8">
-          <div className="glass-card p-6 border-l-4 border-member">
+          <div className="glass-card p-8 border-l-4 border-member">
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-member/10 border border-member/20 text-member">
                 <KanbanSquare className="h-6 w-6" />

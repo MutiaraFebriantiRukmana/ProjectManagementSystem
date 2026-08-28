@@ -85,7 +85,7 @@ function AddMemberModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="glass-card p-6 w-full max-w-md shadow-2xl">
+      <div className="glass-card p-8 w-full max-w-md shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
@@ -183,7 +183,7 @@ function RemoveMemberModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="glass-card p-6 w-full max-w-md shadow-2xl">
+      <div className="glass-card p-8 w-full max-w-md shadow-2xl">
         <div className="flex items-center gap-4 mb-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-error/10 border border-error/20">
             <UserMinus className="h-6 w-6 text-error" />
@@ -288,7 +288,7 @@ export default function Show({ project, available_members }: ShowProps) {
         </nav>
 
         {/* ── Project Header Card ────────────────────────────────────── */}
-        <div className="glass-card p-6 space-y-5">
+        <div className="glass-card p-8 space-y-5">
           {/* Title row */}
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2 flex-1 min-w-0">
@@ -398,7 +398,7 @@ export default function Show({ project, available_members }: ShowProps) {
         {activeTab === 'overview' && (
           <div className="space-y-6">
             {/* Description */}
-            <div className="glass-card p-6 space-y-3">
+            <div className="glass-card p-8 space-y-3">
               <div className="flex items-center gap-2">
                 <Briefcase className="h-4 w-4 text-muted" />
                 <h2 className="text-sm font-semibold text-muted uppercase tracking-wider">
@@ -417,7 +417,7 @@ export default function Show({ project, available_members }: ShowProps) {
             </div>
 
             {/* Member Management */}
-            <div className="glass-card p-6 space-y-4">
+            <div className="glass-card p-8 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-muted" />
