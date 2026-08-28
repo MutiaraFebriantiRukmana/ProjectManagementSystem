@@ -27,6 +27,13 @@ class TaskController extends Controller
     {
         /** @var Project $project */
         $project = Project::findOrFail($request->project_id);
+
+        $user = Auth::user();
+        $isSuperAdmin = $user->roles()->where('name', 'super_admin')->exists() || $user->hasRole('super_admin');
+        if ($project->manager_id !== $user->id && !$isSuperAdmin) {
+            abort(403, 'Tindakan tidak diizinkan! Hanya Project Manager atau Super Admin yang dapat membuat task.');
+        }
+
         Gate::authorize('create', [Task::class, $project]);
 
         $data = $request->validated();
