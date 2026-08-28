@@ -40,7 +40,7 @@ class RoleAndPermissionSeeder extends Seeder
             'users.create',
             'users.update',
             'users.delete',
-            'users.manage_roles',
+            'roles.manage',          // Assign roles to users
 
             // --- Project Management ---
             'projects.view',         // View a project the user has access to
@@ -53,7 +53,7 @@ class RoleAndPermissionSeeder extends Seeder
             'tasks.view',            // View tasks in accessible projects
             'tasks.create',          // Create tasks
             'tasks.update',          // Update task details (PM/SA)
-            'tasks.update_status',   // Change task status (Member)
+            'tasks.change_status',   // Change task status (Member)
             'tasks.delete',          // Delete tasks
             'tasks.assign',          // Assign tasks to users
             'tasks.submit_review',   // Submit task for review (Member)
@@ -70,7 +70,7 @@ class RoleAndPermissionSeeder extends Seeder
             'comments.delete',       // Delete comment
 
             // --- Activity Logs (Audit Trail) ---
-            'activity_logs.view',    // View audit log (SA only)
+            'audit_logs.view',    // View audit log (SA only)
         ];
 
         foreach ($permissions as $permission) {
@@ -102,7 +102,7 @@ class RoleAndPermissionSeeder extends Seeder
             'tasks.view',
             'tasks.create',
             'tasks.update',
-            'tasks.update_status',
+            'tasks.change_status',
             'tasks.delete',
             'tasks.assign',
             'tasks.submit_review',
@@ -123,7 +123,7 @@ class RoleAndPermissionSeeder extends Seeder
         $member->syncPermissions([
             'projects.view',
             'tasks.view',
-            'tasks.update_status',  // Can change own task status
+            'tasks.change_status',  // Can change own task status
             'tasks.submit_review',  // Can submit for review
             'attachments.upload',
             'attachments.download',
