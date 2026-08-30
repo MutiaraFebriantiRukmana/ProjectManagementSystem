@@ -21,6 +21,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import ConfirmModal from '@/Components/ConfirmModal';
+import { hasPermission } from '@/utils/permissions';
 
 interface IndexProps {
   projects: PaginatedResponse<Project>;
@@ -380,20 +381,10 @@ export default function Index({ projects, filters }: IndexProps) {
   const role = user?.roles?.[0] ?? '';
   const permissions = user?.permissions ?? [];
 
-  const canCreate =
-    permissions.includes('projects.create') ||
-    role === 'super_admin' ||
-    role === 'Super Admin' ||
-    role === 'project_manager' ||
-    role === 'Project Manager';
-
-  const canDelete =
-    role === 'super_admin' || role === 'Super Admin';
-
-  const canEditProject = (project: Project) =>
-    role === 'super_admin' ||
-    role === 'Super Admin' ||
-    project.manager_id === user?.id;
+  const canCreate = hasPermission(auth, 'projects.create');
+  const canDeleteProject = hasPermission(auth, 'projects.delete');
+  const canEditProjectFn = (project: Project) =>
+    hasPermission(auth, 'projects.edit') || project.manager_id === user?.id;
 
   // ── Search + filter state ────────────────────────────────────────────
   const [search, setSearch] = useState(filters.search ?? '');
@@ -529,8 +520,8 @@ export default function Index({ projects, filters }: IndexProps) {
                 <ProjectCard
                   key={project.id}
                   project={project}
-                  canEdit={canEditProject(project)}
-                  canDelete={canDelete}
+                  canEdit={canEditProjectFn(project)}
+                  canDelete={canDeleteProject}
                   onDelete={handleDelete}
                 />
               ))}

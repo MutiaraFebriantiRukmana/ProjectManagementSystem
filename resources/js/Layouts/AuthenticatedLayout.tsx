@@ -11,7 +11,8 @@ import {
   Menu, 
   X,
   User as UserIcon,
-  ShieldCheck
+  ShieldCheck,
+  KeyRound,
 } from 'lucide-react';
 
 export default function AuthenticatedLayout({
@@ -113,10 +114,19 @@ export default function AuthenticatedLayout({
           </Link>
 
           {(currentRole === 'super_admin' || currentRole === 'Super Admin') && (
-            <a href="#" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent hover:text-foreground transition-all">
-              <Users className="h-5 w-5 hover:text-secondary transition-colors" />
-              <span>Kelola User & Role</span>
-            </a>
+            <>
+              <div className="mt-2 mb-1 px-4">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Admin</span>
+              </div>
+              <Link href="/admin/users" className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all ${typeof route === 'function' && route().current('admin.users.*') ? 'bg-gradient-to-r from-primary/15 to-transparent border-l-2 border-primary text-foreground' : 'text-muted hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent hover:text-foreground'}`}>
+                <Users className={`h-5 w-5 ${typeof route === 'function' && route().current('admin.users.*') ? 'text-secondary' : 'hover:text-secondary transition-colors'}`} />
+                <span>Kelola Pengguna</span>
+              </Link>
+              <Link href="/admin/roles" className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all ${typeof route === 'function' && route().current('admin.roles.*') ? 'bg-gradient-to-r from-primary/15 to-transparent border-l-2 border-primary text-foreground' : 'text-muted hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent hover:text-foreground'}`}>
+                <KeyRound className={`h-5 w-5 ${typeof route === 'function' && route().current('admin.roles.*') ? 'text-secondary' : 'hover:text-secondary transition-colors'}`} />
+                <span>Kelola Hak Akses</span>
+              </Link>
+            </>
           )}
         </nav>
 
