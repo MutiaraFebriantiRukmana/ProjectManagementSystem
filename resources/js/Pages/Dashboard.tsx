@@ -23,10 +23,15 @@ interface Stats {
   total_users?: number;
   total_projects?: number;
   active_projects?: number;
-  audit_logs_count?: number;
+  total_tasks?: number;
   completed_tasks?: number;
   pending_tasks?: number;
   in_progress_tasks?: number;
+  review_tasks?: number;
+  overdue_tasks?: number;
+  audit_logs_count?: number;
+  completion_rate?: number;
+  member_workload?: { username: string; active_tasks: number }[];
 }
 
 interface DashboardProject {
@@ -93,7 +98,7 @@ function StatCard({
   colorClass: string;
 }) {
   return (
-    <div className="glass-card p-8 shadow-sm">
+    <div className="glass-card p-6 shadow-sm">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-muted">{title}</p>
@@ -111,6 +116,71 @@ function StatCard({
             <span>{trend}</span>
           </span>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Workload & Overdue Section (Poin 15 Brief) ────────────────────────────
+function WorkloadAndOverdueSection({ stats }: { stats?: Stats }) {
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      {/* Overdue & Completion Widget */}
+      <div className="glass-card p-6">
+        <h3 className="font-bold text-foreground text-sm mb-4 flex items-center justify-between">
+          <span>Status Deadline & Overdue</span>
+          {stats?.overdue_tasks && stats.overdue_tasks > 0 ? (
+            <span className="text-xs px-2.5 py-1 rounded-full bg-error/10 text-error font-bold border border-error/25">
+              {stats.overdue_tasks} Task Terlambat
+            </span>
+          ) : (
+            <span className="text-xs px-2.5 py-1 rounded-full bg-success/10 text-success font-bold border border-success/25">
+              Semua Tepat Waktu
+            </span>
+          )}
+        </h3>
+        <p className="text-xs text-muted mb-4">
+          Tingkat penyelesaian task saat ini adalah{' '}
+          <strong className="text-primary">{stats?.completion_rate ?? 0}%</strong> dari total{' '}
+          {stats?.total_tasks ?? 0} task yang terdaftar.
+        </p>
+        <div className="w-full h-3 rounded-full bg-surface-2 overflow-hidden border border-border">
+          <div
+            className="h-full bg-gradient-to-r from-primary to-success rounded-full transition-all duration-500"
+            style={{ width: `${stats?.completion_rate ?? 0}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Member Workload Widget */}
+      <div className="glass-card p-6">
+        <h3 className="font-bold text-foreground text-sm mb-4">
+          Beban Kerja Anggota Tim (Workload)
+        </h3>
+        <div className="space-y-3">
+          {stats?.member_workload && stats.member_workload.length > 0 ? (
+            stats.member_workload.map((m, idx) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between text-xs p-2.5 rounded-xl bg-surface-2/60 border border-border"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="h-6 w-6 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[10px]">
+                    {m.username.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="font-semibold text-foreground">{m.username}</span>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-md bg-surface-1 text-muted border border-border font-medium">
+                  {m.active_tasks} task aktif
+                </span>
+              </div>
+            ))
+          ) : (
+            <p className="text-xs text-muted py-4 text-center">
+              Belum ada delegasi task pada anggota tim.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -143,9 +213,7 @@ function ProjectTable({
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-border">
         <div className="flex items-center gap-2">
           <Folder className={`h-4 w-4 ${accentClass}`} />
-          <h3 className="text-sm font-semibold text-foreground">
-            Project Saya
-          </h3>
+          <h3 className="text-sm font-semibold text-foreground">Project Saya</h3>
           <span className="ml-1 rounded-full bg-surface-2 border border-border px-2 py-0.5 text-xs font-medium text-muted">
             {projects.length}
           </span>
@@ -252,7 +320,9 @@ function ProjectTable({
 
                     {/* Status */}
                     <td className="px-5 py-4">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${statusCfg.badgeClass}`}>
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${statusCfg.badgeClass}`}
+                      >
                         <span className={`h-1.5 w-1.5 rounded-full ${statusCfg.dotColor}`} />
                         {statusCfg.label}
                       </span>
@@ -274,15 +344,19 @@ function ProjectTable({
 }
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
-export default function Dashboard({ stats, projects = [], filters = { status: '' } }: DashboardProps) {
+export default function Dashboard({
+  stats,
+  projects = [],
+  filters = { status: '' },
+}: DashboardProps) {
   const { auth } = usePage<PageProps>().props;
   const user = auth.user;
   const roleRaw = user?.roles?.[0];
   const role = (typeof roleRaw === 'string' ? roleRaw : roleRaw?.name) || 'member';
 
-  const isSuperAdmin   = role === 'super_admin' || role === 'Super Admin';
-  const isProjectMgr   = role === 'project_manager' || role === 'Project Manager';
-  const isMember       = !isSuperAdmin && !isProjectMgr;
+  const isSuperAdmin = role === 'super_admin' || role === 'Super Admin';
+  const isProjectMgr = role === 'project_manager' || role === 'Project Manager';
+  const isMember = !isSuperAdmin && !isProjectMgr;
 
   return (
     <AuthenticatedLayout header="Dashboard Monitoring">
@@ -299,7 +373,8 @@ export default function Dashboard({ stats, projects = [], filters = { status: ''
               <div>
                 <h2 className="text-lg font-bold text-foreground">Welcome Back, Super Admin!</h2>
                 <p className="mt-1 text-sm text-muted">
-                  Anda memiliki akses penuh untuk mengelola pengguna, memantau infrastruktur data project, dan memverifikasi audit log sistem.
+                  Anda memiliki akses penuh untuk mengelola pengguna, memantau infrastruktur data project,
+                  dan memverifikasi audit log sistem.
                 </p>
               </div>
             </div>
@@ -335,6 +410,9 @@ export default function Dashboard({ stats, projects = [], filters = { status: ''
               colorClass="text-success border-success/20 bg-success/10"
             />
           </div>
+
+          {/* Workload & Overdue Section */}
+          <WorkloadAndOverdueSection stats={stats} />
         </div>
       )}
 
@@ -349,7 +427,8 @@ export default function Dashboard({ stats, projects = [], filters = { status: ''
               <div>
                 <h2 className="text-lg font-bold text-foreground">Halo, Project Manager!</h2>
                 <p className="mt-1 text-sm text-muted">
-                  Kelola siklus hidup project, delegasikan task, dan pantau milestone tim Anda secara real-time.
+                  Kelola siklus hidup project, delegasikan task, dan pantau milestone tim Anda secara
+                  real-time.
                 </p>
               </div>
             </div>
@@ -365,7 +444,7 @@ export default function Dashboard({ stats, projects = [], filters = { status: ''
             />
             <StatCard
               title="Total Project"
-              value={projects.length}
+              value={projects.length || (stats?.total_projects ?? 0)}
               icon={FolderKanban}
               description="Project yang Anda kelola"
               colorClass="text-primary border-primary/20 bg-primary/10"
@@ -385,6 +464,9 @@ export default function Dashboard({ stats, projects = [], filters = { status: ''
               colorClass="text-success border-success/20 bg-success/10"
             />
           </div>
+
+          {/* Workload & Overdue Section */}
+          <WorkloadAndOverdueSection stats={stats} />
 
           {/* Project Table */}
           <ProjectTable
@@ -406,7 +488,8 @@ export default function Dashboard({ stats, projects = [], filters = { status: ''
               <div>
                 <h2 className="text-lg font-bold text-foreground">Halo, Tim Member!</h2>
                 <p className="mt-1 text-sm text-muted">
-                  Lihat tugas yang diberikan kepada Anda, update status pengerjaan, dan submit task untuk review.
+                  Lihat tugas yang diberikan kepada Anda, update status pengerjaan, dan submit task untuk
+                  review.
                 </p>
               </div>
             </div>
@@ -415,7 +498,7 @@ export default function Dashboard({ stats, projects = [], filters = { status: ''
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               title="Project Terdaftar"
-              value={projects.length}
+              value={projects.length || (stats?.total_projects ?? 0)}
               icon={Briefcase}
               description="Project yang dapat Anda akses"
               colorClass="text-member border-member/20 bg-member/10"
@@ -442,6 +525,9 @@ export default function Dashboard({ stats, projects = [], filters = { status: ''
               colorClass="text-success border-success/20 bg-success/10"
             />
           </div>
+
+          {/* Workload & Overdue Section */}
+          <WorkloadAndOverdueSection stats={stats} />
 
           {/* Project Table */}
           <ProjectTable

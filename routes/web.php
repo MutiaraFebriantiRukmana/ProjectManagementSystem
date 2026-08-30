@@ -14,6 +14,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 /*
@@ -42,16 +43,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/me', [AuthController::class, 'me'])->name('me');
 
     // --- Dashboard ---
-    Route::get('/dashboard', function () {
-        // Menggunakan Auth::user() dan Fully Qualified DocBlock agar Intelephense tidak merah
+    Route::get('/dashboard', function (Request $request) {
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        // Cache agregasi berat selama 60 detik per user
         $stats = Cache::remember("dashboard_stats_user_{$user->id}", 60, function () use ($user) {
             $isSuperAdmin = $user->hasRole('super_admin');
 
-            // Scope project yang bisa diakses user
             $projectQuery = Project::query();
             if (!$isSuperAdmin) {
                 $projectQuery->where(function ($q) use ($user) {
@@ -63,8 +61,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             $tasksQuery = Task::whereIn('project_id', $projectIds);
 
-            $totalTasks = (clone $tasksQuery)->count();
+            $totalTasks     = (clone $tasksQuery)->count();
             $completedTasks = (clone $tasksQuery)->where('status', 'done')->count();
+
+            // Hitung Task Overdue (Deadline sudah lewat tapi belum Done)
+            $overdueTasks = (clone $tasksQuery)
+                ->where('status', '!=', 'done')
+                ->whereNotNull('end_date')
+                ->whereDate('end_date', '<', now())
+                ->count();
+
+            // Hitung Workload per Anggota (Maksimal 6 member aktif)
+            $memberWorkload = User::role('member')
+                ->withCount(['assignedTasks' => function ($q) {
+                    $q->where('status', '!=', 'done');
+                }])
+                ->orderByDesc('assigned_tasks_count')
+                ->take(6)
+                ->get(['id', 'username', 'email'])
+                ->map(fn ($u) => [
+                    'username'    => $u->username,
+                    'active_tasks' => $u->assigned_tasks_count,
+                ]);
 
             return [
                 'total_users'       => User::count(),
@@ -75,8 +93,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'pending_tasks'     => (clone $tasksQuery)->whereIn('status', ['todo', 'backlog'])->count(),
                 'in_progress_tasks' => (clone $tasksQuery)->where('status', 'in_progress')->count(),
                 'review_tasks'      => (clone $tasksQuery)->where('status', 'review')->count(),
+                'overdue_tasks'     => $overdueTasks,
                 'audit_logs_count'  => ActivityLog::count(),
                 'completion_rate'   => $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100) : 0,
+                'member_workload'   => $memberWorkload,
             ];
         });
 
