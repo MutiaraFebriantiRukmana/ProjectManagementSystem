@@ -102,7 +102,7 @@ class ProjectController extends Controller
         return Inertia::render('Projects/Show', [
             'project' => $project->load([
                 'manager', 
-                'members', 
+                'members.roles', 
                 'tasks.assignees', 
                 'tasks.labels', 
                 'tasks.dependencies', 
