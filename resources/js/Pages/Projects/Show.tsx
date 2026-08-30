@@ -223,17 +223,13 @@ export default function Show({ project, available_members, labels }: ShowProps) 
     );
 
     // Segment members
-    const internalMembers = members.filter(m => {
-        const r = m.roles?.[0] ?? '';
-        const rName = typeof r === 'string' ? r : (r as any)?.name ?? '';
-        return rName === 'project_manager' || rName === 'Project Manager' || rName === 'member' || rName === 'Member';
-    });
-    
     const clientMembers = members.filter(m => {
         const r = m.roles?.[0] ?? '';
         const rName = typeof r === 'string' ? r : (r as any)?.name ?? '';
         return rName === 'client' || rName === 'Viewer / Client' || rName === 'viewer';
     });
+
+    const internalMembers = members.filter(m => !clientMembers.includes(m));
 
     const [activeTab, setActiveTab]         = useState<Tab>('kanban');
     const [showAddModal, setShowAddModal]   = useState(false);
