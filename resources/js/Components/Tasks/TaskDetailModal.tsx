@@ -137,14 +137,15 @@ export default function TaskDetailModal({
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [togglingStatus, setTogglingStatus] = useState(false);
     const [dragOver, setDragOver] = useState(false);
+    const [mentionSearch, setMentionSearch] = useState<string | null>(null);
 
     // Editing assignee state
     const [editingAssignees, setEditingAssignees] = useState(false);
     const [selectedAssignees, setSelectedAssignees] = useState<number[]>((initialTask.assignees ?? []).map(a => a.id));
     const [updatingAssignees, setUpdatingAssignees] = useState(false);
 
-    // Confirm upload state
-    const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null);
+    const [confirmSaveAssignees, setConfirmSaveAssignees] = useState(false);
+    const [confirmDeleteCommentId, setConfirmDeleteCommentId] = useState<number | null>(null);
 
     // ── Approval Workflow state ────────────────────────────────────────────────
     const [submittingReview, setSubmittingReview] = useState(false);
@@ -155,6 +156,11 @@ export default function TaskDetailModal({
     const [approveNote, setApproveNote]             = useState('');
     const [showApproveNote, setShowApproveNote]     = useState(false);
     const [showHistory, setShowHistory]             = useState(false);
+    
+    // Confirm Modals for Workflow
+    const [confirmSubmitReview, setConfirmSubmitReview] = useState(false);
+    const [confirmApprove, setConfirmApprove] = useState(false);
+    const [confirmReject, setConfirmReject] = useState(false);
 
     const { data: uploadData, setData: setUploadData, post: postUpload, processing: uploadProcessing, reset: resetUpload } = useForm({ file: null as File | null });
 
@@ -167,7 +173,7 @@ export default function TaskDetailModal({
 
     const isSuperAdmin     = roleName === 'super_admin';
     const isProjectManager = currentUser.id === projectManagerId;
-const isCanApprove     = isSuperAdmin || isProjectManager;
+    const isCanApprove     = isProjectManager;
     const isCanManageTask  = isSuperAdmin || isProjectManager;
     const canEditTask      = isSuperAdmin || isProjectManager;
     const isAssignee       = (task.assignees ?? []).some((a) => a.id === currentUser.id);
@@ -264,9 +270,12 @@ const isCanApprove     = isSuperAdmin || isProjectManager;
         );
     };
 
-    const deleteComment = (commentId: number) => {
+    const deleteComment = () => {
+        if (confirmDeleteCommentId === null) return;
+        const commentId = confirmDeleteCommentId;
         const snap = [...comments];
         setComments((prev) => prev.filter((c) => c.id !== commentId));
+        setConfirmDeleteCommentId(null);
         router.delete(`/comments/${commentId}`, {
             preserveScroll: true,
             preserveState: true,
@@ -428,6 +437,7 @@ const isCanApprove     = isSuperAdmin || isProjectManager;
     const saveAssignees = () => {
         if (updatingAssignees) return;
         setUpdatingAssignees(true);
+        setConfirmSaveAssignees(false);
         router.patch(`/tasks/${task.id}`, { assignees: selectedAssignees }, {
                 preserveScroll: true,
                 preserveState: true,
@@ -576,7 +586,7 @@ const isCanApprove     = isSuperAdmin || isProjectManager;
                                         {/* Member / Assignee / Reporter / PM: submit for review saat task berstatus todo / in_progress */}
                                         {(isAssignee || isReporter || isCanApprove) && ['todo', 'in_progress'].includes(task.status) && (
                                             <button
-                                                onClick={submitForReview}
+                                                onClick={() => setConfirmSubmitReview(true)}
                                                 disabled={submittingReview}
                                                 className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 active:scale-[0.98] transition-all disabled:opacity-60"
                                             >
@@ -594,14 +604,7 @@ const isCanApprove     = isSuperAdmin || isProjectManager;
                                                 <div className="flex flex-wrap gap-2">
                                                     {/* Approve button */}
                                                     <button
-                                                        onClick={() => {
-                                                            if (showApproveNote) {
-                                                                approveTask();
-                                                            } else {
-                                                                setShowApproveNote(true);
-                                                                setShowRevisionInput(false);
-                                                            }
-                                                        }}
+                                                        onClick={() => { setConfirmApprove(true); setApproveNote(''); }}
                                                         disabled={approvingTask}
                                                         className="inline-flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-4 py-2.5 text-sm font-semibold text-success hover:bg-success/20 active:scale-[0.98] transition-all disabled:opacity-60"
                                                     >
@@ -609,15 +612,12 @@ const isCanApprove     = isSuperAdmin || isProjectManager;
                                                             ? <Loader2 className="h-4 w-4 animate-spin" />
                                                             : <CheckCircle className="h-4 w-4" />
                                                         }
-                                                        {showApproveNote ? 'Konfirmasi Setujui' : 'Setujui'}
+                                                        Setujui
                                                     </button>
 
                                                     {/* Request revision button */}
                                                     <button
-                                                        onClick={() => {
-                                                            setShowRevisionInput((v) => !v);
-                                                            setShowApproveNote(false);
-                                                        }}
+                                                        onClick={() => { setConfirmReject(true); setRevisionNote(''); }}
                                                         disabled={rejectingTask}
                                                         className="inline-flex items-center gap-2 rounded-xl border border-error/30 bg-error/10 px-4 py-2.5 text-sm font-semibold text-error hover:bg-error/20 active:scale-[0.98] transition-all disabled:opacity-60"
                                                     >
@@ -628,58 +628,6 @@ const isCanApprove     = isSuperAdmin || isProjectManager;
                                                         Minta Revisi
                                                     </button>
                                                 </div>
-
-                                                {/* Optional approve note */}
-                                                {showApproveNote && (
-                                                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                                                        <textarea
-                                                            rows={2}
-                                                            placeholder="Catatan persetujuan (opsional)..."
-                                                            value={approveNote}
-                                                            onChange={(e) => setApproveNote(e.target.value)}
-                                                            className="w-full rounded-xl border border-success/20 bg-surface-1 px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-success/40 focus:ring-2 focus:ring-success/15 transition-all resize-none"
-                                                        />
-                                                        <button
-                                                            onClick={() => { setShowApproveNote(false); setApproveNote(''); }}
-                                                            className="text-xs text-muted hover:text-foreground transition-colors"
-                                                        >
-                                                            Batal
-                                                        </button>
-                                                    </div>
-                                                )}
-
-                                                {/* Required revision note */}
-                                                {showRevisionInput && (
-                                                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                                                        <textarea
-                                                            rows={3}
-                                                            autoFocus
-                                                            placeholder="Jelaskan revisi yang dibutuhkan... (wajib diisi)"
-                                                            value={revisionNote}
-                                                            onChange={(e) => setRevisionNote(e.target.value)}
-                                                            className="w-full rounded-xl border border-error/20 bg-surface-1 px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-error/40 focus:ring-2 focus:ring-error/15 transition-all resize-none"
-                                                        />
-                                                        <div className="flex items-center gap-2">
-                                                            <button
-                                                                onClick={requestRevision}
-                                                                disabled={!revisionNote.trim() || rejectingTask}
-                                                                className="inline-flex items-center gap-2 rounded-lg border border-error/30 bg-error/10 px-3 py-1.5 text-xs font-semibold text-error hover:bg-error/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                                                            >
-                                                                {rejectingTask
-                                                                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                                    : <RotateCcw className="h-3.5 w-3.5" />
-                                                                }
-                                                                Kirim Permintaan Revisi
-                                                            </button>
-                                                            <button
-                                                                onClick={() => { setShowRevisionInput(false); setRevisionNote(''); }}
-                                                                className="text-xs text-muted hover:text-foreground transition-colors"
-                                                            >
-                                                                Batal
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -764,7 +712,7 @@ const isCanApprove     = isSuperAdmin || isProjectManager;
                                                     <span className="text-sm text-foreground">{m.username}</span>
                                                 </label>
                                             ))}
-                                            <button onClick={saveAssignees} disabled={updatingAssignees} className="mt-2 w-full rounded-lg bg-primary/10 border border-primary/20 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors">
+                                            <button onClick={() => setConfirmSaveAssignees(true)} disabled={updatingAssignees} className="mt-2 w-full rounded-lg bg-primary/10 border border-primary/20 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors">
                                                 {updatingAssignees ? 'Menyimpan...' : 'Simpan'}
                                             </button>
                                         </div>
@@ -849,7 +797,7 @@ const isCanApprove     = isSuperAdmin || isProjectManager;
                                                 </p>
                                             </div>
                                             {(currentUser.id === c.user_id || isSuperAdmin) && (
-                                                <button onClick={() => deleteComment(c.id)} className="p-1.5 rounded-lg text-muted hover:text-error transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
+                                                <button onClick={() => setConfirmDeleteCommentId(c.id)} className="p-1.5 rounded-lg text-muted hover:text-error transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
                                             )}
                                         </div>
                                     ))}
