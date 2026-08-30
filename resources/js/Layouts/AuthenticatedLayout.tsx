@@ -26,7 +26,8 @@ export default function AuthenticatedLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Ambil role utama dari Spatie array
-  const currentRole = user?.roles?.[0] || 'member';
+  const roleRaw = user?.roles?.[0];
+  const currentRole = (typeof roleRaw === 'string' ? roleRaw : roleRaw?.name) || 'member';
 
   const getRoleColor = (roleName: string) => {
     switch (roleName) {
@@ -100,16 +101,15 @@ export default function AuthenticatedLayout({
           </div>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 space-y-1.5 p-4 overflow-y-auto relative z-10">
-          <Link href="/dashboard" className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-primary/15 to-transparent border-l-2 border-primary px-4 py-3 text-sm font-medium text-foreground">
-            <LayoutDashboard className="h-5 w-5 text-secondary" />
-            <span>Dashboard</span>
+          <Link href="/dashboard" className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all ${typeof route === 'function' && route().current('dashboard') ? 'bg-gradient-to-r from-primary/15 to-transparent border-l-2 border-primary text-foreground' : 'text-muted hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent hover:text-foreground'}`}>
+            <LayoutDashboard className={`h-5 w-5 ${typeof route === 'function' && route().current('dashboard') ? 'text-secondary' : 'hover:text-secondary transition-colors'}`} />
+            <span>Dasbor</span>
           </Link>
 
-          <Link href="/projects" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent hover:text-foreground transition-all">
-            <Briefcase className="h-5 w-5 hover:text-secondary transition-colors" />
-            <span>Project Management</span>
+          <Link href="/projects" className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all ${typeof route === 'function' && route().current('projects.*') ? 'bg-gradient-to-r from-primary/15 to-transparent border-l-2 border-primary text-foreground' : 'text-muted hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent hover:text-foreground'}`}>
+            <Briefcase className={`h-5 w-5 ${typeof route === 'function' && route().current('projects.*') ? 'text-secondary' : 'hover:text-secondary transition-colors'}`} />
+            <span>Manajemen Project</span>
           </Link>
 
           {(currentRole === 'super_admin' || currentRole === 'Super Admin') && (

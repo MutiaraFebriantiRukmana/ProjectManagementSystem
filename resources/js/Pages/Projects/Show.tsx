@@ -31,6 +31,7 @@ import {
     Download,
     FolderOpen,
 } from 'lucide-react';
+import ConfirmModal from '@/Components/ConfirmModal';
 
 // ─── Props interface ───────────────────────────────────────────────────────────
 interface ShowProps {
@@ -167,44 +168,24 @@ function RemoveMemberModal({
     projectId: number;
     onClose: () => void;
 }) {
-    const [processing, setProcessing] = useState(false);
-
     const confirm = () => {
-        setProcessing(true);
         router.delete(`/projects/${projectId}/members/${member.id}`, {
-            onFinish: () => { setProcessing(false); onClose(); },
+            onFinish: () => { onClose(); },
+            preserveScroll: true
         });
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="glass-card p-8 w-full max-w-md shadow-2xl">
-                <div className="flex items-center gap-4 mb-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-error/10 border border-error/20">
-                        <UserMinus className="h-6 w-6 text-error" />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-foreground">Hapus Anggota?</h3>
-                        <p className="text-sm text-muted">Tindakan ini dapat dibatalkan dengan menambah ulang.</p>
-                    </div>
-                </div>
-                <p className="text-sm text-muted mb-6">
-                    Anda akan menghapus <span className="font-semibold text-foreground">{member.username}</span> dari project ini.
-                </p>
-                <div className="flex gap-3">
-                    <button onClick={onClose} className="flex-1 rounded-xl border border-border py-2.5 text-sm font-medium text-muted hover:bg-surface-2 transition-colors">Batal</button>
-                    <button
-                        id={`confirm-remove-member-${member.id}`}
-                        onClick={confirm}
-                        disabled={processing}
-                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-error py-2.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-60 transition-all"
-                    >
-                        {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserMinus className="h-4 w-4" />}
-                        Ya, Hapus
-                    </button>
-                </div>
-            </div>
-        </div>
+        <ConfirmModal
+            isOpen={true}
+            title="Hapus Anggota?"
+            message={`Anda akan menghapus ${member.username} dari project ini. Tindakan ini dapat dibatalkan dengan menambah ulang.`}
+            confirmText="Ya, Hapus"
+            cancelText="Batal"
+            type="danger"
+            onConfirm={confirm}
+            onCancel={onClose}
+        />
     );
 }
 
@@ -240,11 +221,25 @@ export default function Show({ project, available_members, labels }: ShowProps) 
         (t.attachments ?? []).map((a) => ({ ...a, taskTitle: t.title }))
     );
 
+    // Segment members
+    const internalMembers = members.filter(m => {
+        const r = m.roles?.[0] ?? '';
+        const rName = typeof r === 'string' ? r : (r as any)?.name ?? '';
+        return rName === 'project_manager' || rName === 'Project Manager' || rName === 'member' || rName === 'Member';
+    });
+    
+    const clientMembers = members.filter(m => {
+        const r = m.roles?.[0] ?? '';
+        const rName = typeof r === 'string' ? r : (r as any)?.name ?? '';
+        return rName === 'client' || rName === 'Viewer / Client' || rName === 'viewer';
+    });
+
     const [activeTab, setActiveTab]         = useState<Tab>('kanban');
     const [showAddModal, setShowAddModal]   = useState(false);
     const [removingMember, setRemovingMember] = useState<User | null>(null);
     const [selectedTask, setSelectedTask]   = useState<Task | null>(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [statusConfirm, setStatusConfirm] = useState<string | null>(null);
 
     const tabs = [
         { key: 'kanban'   as Tab, label: 'Board Kanban',        Icon: KanbanSquare },
@@ -257,6 +252,20 @@ export default function Show({ project, available_members, labels }: ShowProps) 
     const handleTaskUpdate = (updatedTask: Task) => {
         // For subtask adds that use router.post, Inertia will auto-refresh props.
         // No manual state merge needed since Inertia refreshes the page props.
+    };
+
+    const confirmStatusChange = () => {
+        if (!statusConfirm) return;
+        router.patch(
+            `/projects/${project.id}`,
+            { status: statusConfirm },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => setStatusConfirm(null),
+                onError: () => setStatusConfirm(null),
+            }
+        );
     };
 
     return (
@@ -297,9 +306,24 @@ export default function Show({ project, available_members, labels }: ShowProps) 
                     <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="space-y-2 flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${status.badgeClass}`}>
-                                    {status.label}
-                                </span>
+                                {canEdit ? (
+                                    <select
+                                        value={project.status}
+                                        onChange={(e) => setStatusConfirm(e.target.value)}
+                                        className={`appearance-none cursor-pointer rounded-full px-3 py-1 pl-4 pr-6 text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/20 ${status.badgeClass} border border-transparent`}
+                                        style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.2rem center', backgroundSize: '1em' }}
+                                    >
+                                        <option value="planning" className="bg-surface-2 text-foreground">Planning</option>
+                                        <option value="active" className="bg-surface-2 text-foreground">Active</option>
+                                        <option value="on_hold" className="bg-surface-2 text-foreground">On Hold</option>
+                                        <option value="completed" className="bg-surface-2 text-foreground">Completed</option>
+                                        <option value="cancelled" className="bg-surface-2 text-foreground">Cancelled</option>
+                                    </select>
+                                ) : (
+                                    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${status.badgeClass}`}>
+                                        {status.label}
+                                    </span>
+                                )}
                                 {deadline && (
                                     <span className={`inline-flex items-center gap-1 text-xs ${deadline.colorClass}`}>
                                         <deadline.Icon className="h-3.5 w-3.5" />
@@ -484,33 +508,74 @@ export default function Show({ project, available_members, labels }: ShowProps) 
                                     <p className="text-sm text-muted">Belum ada anggota yang ditambahkan.</p>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-border">
-                                    {members.map((member) => (
-                                        <div key={member.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-9 w-9 rounded-xl bg-member/10 border border-member/20 flex items-center justify-center text-sm font-bold text-member">
-                                                    {member.username?.charAt(0).toUpperCase()}
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-medium text-foreground">{member.username}</p>
-                                                    <div className="flex items-center gap-1 text-xs text-muted">
-                                                        <Mail className="h-3 w-3" />
-                                                        {member.email}
+                                <div className="space-y-6">
+                                    {internalMembers.length > 0 && (
+                                        <div>
+                                            <h3 className="text-xs font-semibold text-primary uppercase tracking-wider mb-3">Tim Internal</h3>
+                                            <div className="divide-y divide-border">
+                                                {internalMembers.map((member) => (
+                                                    <div key={member.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="h-9 w-9 rounded-xl bg-member/10 border border-member/20 flex items-center justify-center text-sm font-bold text-member">
+                                                                {member.username?.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-medium text-foreground">{member.username}</p>
+                                                                <div className="flex items-center gap-1 text-xs text-muted">
+                                                                    <Mail className="h-3 w-3" />
+                                                                    {member.email}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        {canManageMembers && (
+                                                            <button
+                                                                id={`btn-remove-member-${member.id}`}
+                                                                onClick={() => setRemovingMember(member)}
+                                                                title={`Hapus ${member.username}`}
+                                                                className="p-1.5 rounded-lg text-muted hover:bg-error/10 hover:text-error transition-colors"
+                                                            >
+                                                                <UserMinus className="h-4 w-4" />
+                                                            </button>
+                                                        )}
                                                     </div>
-                                                </div>
+                                                ))}
                                             </div>
-                                            {canManageMembers && (
-                                                <button
-                                                    id={`btn-remove-member-${member.id}`}
-                                                    onClick={() => setRemovingMember(member)}
-                                                    title={`Hapus ${member.username}`}
-                                                    className="p-1.5 rounded-lg text-muted hover:bg-error/10 hover:text-error transition-colors"
-                                                >
-                                                    <UserMinus className="h-4 w-4" />
-                                                </button>
-                                            )}
                                         </div>
-                                    ))}
+                                    )}
+
+                                    {clientMembers.length > 0 && (
+                                        <div>
+                                            <h3 className="text-xs font-semibold text-client uppercase tracking-wider mb-3 mt-4">Klien / Viewer</h3>
+                                            <div className="divide-y divide-border">
+                                                {clientMembers.map((member) => (
+                                                    <div key={member.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="h-9 w-9 rounded-xl bg-client/10 border border-client/20 flex items-center justify-center text-sm font-bold text-client">
+                                                                {member.username?.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-medium text-foreground">{member.username}</p>
+                                                                <div className="flex items-center gap-1 text-xs text-muted">
+                                                                    <Mail className="h-3 w-3" />
+                                                                    {member.email}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        {canManageMembers && (
+                                                            <button
+                                                                id={`btn-remove-member-${member.id}`}
+                                                                onClick={() => setRemovingMember(member)}
+                                                                title={`Hapus ${member.username}`}
+                                                                className="p-1.5 rounded-lg text-muted hover:bg-error/10 hover:text-error transition-colors"
+                                                            >
+                                                                <UserMinus className="h-4 w-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -620,6 +685,20 @@ export default function Show({ project, available_members, labels }: ShowProps) 
                     onTaskUpdate={handleTaskUpdate}
                 />
             )}
+
+            {/* Confirm Status Modal */}
+            <ConfirmModal
+                isOpen={!!statusConfirm}
+                title="Ubah Status Project"
+                message={`Apakah Anda yakin ingin mengubah status project ini menjadi ${
+                    statusConfirm ? STATUS_CONFIG[statusConfirm]?.label : ''
+                }?`}
+                confirmText="Ya, Ubah"
+                cancelText="Batal"
+                type="primary"
+                onConfirm={confirmStatusChange}
+                onCancel={() => setStatusConfirm(null)}
+            />
         </AuthenticatedLayout>
     );
 }

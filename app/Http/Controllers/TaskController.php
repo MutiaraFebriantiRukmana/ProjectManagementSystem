@@ -63,6 +63,41 @@ class TaskController extends Controller
     }
 
     /**
+     * Update Data Task General (termasuk Assignees)
+     */
+    public function update(\Illuminate\Http\Request $request, Task $task): RedirectResponse
+    {
+        // Authorization check
+        $project = $task->project;
+        $user = auth()->user();
+        $isSuperAdmin = $user->roles()->where('name', 'super_admin')->exists() || $user->hasRole('super_admin');
+        
+        if (auth()->id() !== $project->manager_id && !$isSuperAdmin) {
+            abort(403, 'Tindakan tidak diizinkan! Hanya Project Manager atau Super Admin yang dapat mengubah assignees.');
+        }
+
+        // Validate
+        $data = $request->validate([
+            'title' => 'sometimes|string|max:255',
+            'description' => 'sometimes|nullable|string',
+            'status' => 'sometimes|string',
+            'priority' => 'sometimes|string',
+            'assignees' => 'sometimes|array',
+            'assignees.*' => 'exists:users,id',
+        ]);
+
+        // Update basic fields
+        $task->update($request->only(['title', 'description', 'status', 'priority']));
+
+        // Update Assignees (Pivot)
+        if ($request->has('assignees')) {
+            $task->assignees()->sync($request->assignees);
+        }
+
+        return back()->with('success', 'Task berhasil diperbarui.');
+    }
+
+    /**
      * Update Status & Posisi Kanban (Drag and Drop + Dependency Validation).
      */
     public function updateStatus(UpdateTaskStatusRequest $request, Task $task): RedirectResponse
