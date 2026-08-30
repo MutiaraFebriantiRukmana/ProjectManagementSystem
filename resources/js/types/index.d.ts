@@ -108,3 +108,6 @@ export type PageProps<T extends Record<string, unknown> = Record<string, unknown
         error?: string;
     };
 };
+// Ziggy global route helper type declaration
+declare function route(): { current(name: string): boolean };
+declare function route(name: string, params?: Record<string, any>): string;

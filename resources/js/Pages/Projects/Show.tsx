@@ -30,7 +30,9 @@ import {
     File,
     Download,
     FolderOpen,
+    LayoutTemplate,
 } from 'lucide-react';
+import { hasPermission } from '@/utils/permissions';
 import ConfirmModal from '@/Components/ConfirmModal';
 
 // ─── Props interface ───────────────────────────────────────────────────────────
@@ -203,8 +205,7 @@ export default function Show({ project, available_members, labels }: ShowProps) 
     const isManager        = project.manager_id === user?.id;
     const canManageMembers = isSuperAdmin || isManager;
     const canEdit          = isSuperAdmin || isManager;
-    const canCreateTask    =
-        user?.permissions?.includes('tasks.create') || isSuperAdmin || isManager;
+    const canCreateTask    = hasPermission(auth, 'tasks.create') || isManager;
 
     const status   = STATUS_CONFIG[project.status] ?? STATUS_CONFIG.planning;
     const deadline = project.end_date ? getDeadlineInfo(project.end_date) : null;
@@ -222,17 +223,13 @@ export default function Show({ project, available_members, labels }: ShowProps) 
     );
 
     // Segment members
-    const internalMembers = members.filter(m => {
-        const r = m.roles?.[0] ?? '';
-        const rName = typeof r === 'string' ? r : (r as any)?.name ?? '';
-        return rName === 'project_manager' || rName === 'Project Manager' || rName === 'member' || rName === 'Member';
-    });
-    
     const clientMembers = members.filter(m => {
         const r = m.roles?.[0] ?? '';
         const rName = typeof r === 'string' ? r : (r as any)?.name ?? '';
         return rName === 'client' || rName === 'Viewer / Client' || rName === 'viewer';
     });
+
+    const internalMembers = members.filter(m => !clientMembers.includes(m));
 
     const [activeTab, setActiveTab]         = useState<Tab>('kanban');
     const [showAddModal, setShowAddModal]   = useState(false);
@@ -520,7 +517,13 @@ export default function Show({ project, available_members, labels }: ShowProps) 
                                                                 {member.username?.charAt(0).toUpperCase()}
                                                             </div>
                                                             <div>
-                                                                <p className="text-sm font-medium text-foreground">{member.username}</p>
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="text-sm font-medium text-foreground">{member.username}</p>
+                                                                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                                                                        <ShieldCheck className="h-2.5 w-2.5" />
+                                                                        {typeof member.roles?.[0] === 'string' ? member.roles[0].replace('_', ' ') : (member.roles?.[0] as any)?.name?.replace('_', ' ') ?? 'Member'}
+                                                                    </span>
+                                                                </div>
                                                                 <div className="flex items-center gap-1 text-xs text-muted">
                                                                     <Mail className="h-3 w-3" />
                                                                     {member.email}
@@ -554,7 +557,13 @@ export default function Show({ project, available_members, labels }: ShowProps) 
                                                                 {member.username?.charAt(0).toUpperCase()}
                                                             </div>
                                                             <div>
-                                                                <p className="text-sm font-medium text-foreground">{member.username}</p>
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="text-sm font-medium text-foreground">{member.username}</p>
+                                                                    <span className="inline-flex items-center gap-1 rounded-full bg-purple-400/10 border border-purple-400/20 px-2 py-0.5 text-[10px] font-semibold text-purple-400">
+                                                                        <ShieldCheck className="h-2.5 w-2.5" />
+                                                                        {typeof member.roles?.[0] === 'string' ? member.roles[0].replace('_', ' ') : (member.roles?.[0] as any)?.name?.replace('_', ' ') ?? 'Client'}
+                                                                    </span>
+                                                                </div>
                                                                 <div className="flex items-center gap-1 text-xs text-muted">
                                                                     <Mail className="h-3 w-3" />
                                                                     {member.email}

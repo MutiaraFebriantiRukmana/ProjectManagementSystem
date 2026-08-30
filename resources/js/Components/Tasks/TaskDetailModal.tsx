@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { router, useForm } from '@inertiajs/react';
+import { router, useForm, usePage } from '@inertiajs/react';
 import { Task, Comment, TaskAttachment, User, Approval } from '@/types';
 import {
     X,
@@ -32,6 +32,7 @@ import {
     ChevronUp,
 } from 'lucide-react';
 import ConfirmModal from '@/Components/ConfirmModal';
+import { hasPermission } from '@/utils/permissions';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatBytes(bytes: number): string {
@@ -166,16 +167,14 @@ export default function TaskDetailModal({
 
     const isSuperAdmin     = roleName === 'super_admin';
     const isProjectManager = currentUser.id === projectManagerId;
-    // Approval workflow: ONLY the project's assigned PM can approve/reject.
-    // Super Admin and Viewers are intentionally excluded — approval is a PM-to-member workflow.
-    const isCanApprove     = isProjectManager;
-    // Broader task management rights (edit assignees, delete) still include SA.
+const isCanApprove     = isSuperAdmin || isProjectManager;
     const isCanManageTask  = isSuperAdmin || isProjectManager;
+    const canEditTask      = isSuperAdmin || isProjectManager;
     const isAssignee       = (task.assignees ?? []).some((a) => a.id === currentUser.id);
     const isReporter       = currentUser.id === task.reporter_id;
     const isCanDelete      = isSuperAdmin || isProjectManager;
 
-    const priority     = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
+    const priority         = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
     const PriorityIcon = priority.Icon;
 
     useEffect(() => {
@@ -274,6 +273,46 @@ export default function TaskDetailModal({
             onError: () => setComments(snap),
         });
     };
+
+    const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const val = e.target.value;
+        setCommentText(val);
+
+        const cursorPosition = e.target.selectionStart;
+        const textBeforeCursor = val.slice(0, cursorPosition);
+        
+        const match = textBeforeCursor.match(/@(\w*)$/);
+        
+        if (match) {
+            setMentionSearch(match[1]);
+        } else {
+            setMentionSearch(null);
+        }
+    };
+
+    const insertMention = (username: string) => {
+        if (!commentInputRef.current) return;
+        const cursorPosition = commentInputRef.current.selectionStart;
+        const textBeforeCursor = commentText.slice(0, cursorPosition);
+        const textAfterCursor = commentText.slice(cursorPosition);
+        
+        const match = textBeforeCursor.match(/@(\w*)$/);
+        if (match) {
+            const beforeMention = textBeforeCursor.slice(0, match.index);
+            const newText = beforeMention + `@${username} ` + textAfterCursor;
+            setCommentText(newText);
+            setMentionSearch(null);
+            setTimeout(() => commentInputRef.current?.focus(), 10);
+        }
+    };
+
+    const filteredMentions = mentionSearch !== null
+        ? projectMembers.filter(
+            u => u.id !== currentUser.id && 
+                 u.username.toLowerCase().includes(mentionSearch.toLowerCase())
+          )
+        : [];
+
 
     const uploadFile = (file: File) => {
         if (uploadProcessing) return;
@@ -761,12 +800,14 @@ export default function TaskDetailModal({
                                         </button>
                                     ))}
                                 </div>
-                                <div className="flex gap-2 mt-3">
-                                    <input type="text" placeholder="+ Tambah subtask..." value={subtaskInput} onChange={(e) => setSubtaskInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addSubtask(); }} className="flex-1 rounded-xl border border-border bg-surface-1 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
-                                    <button onClick={addSubtask} disabled={addingSubtask || !subtaskInput.trim()} className="px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-colors">
-                                        {addingSubtask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                                    </button>
-                                </div>
+                                {canEditTask && (
+                                    <div className="flex gap-2 mt-3">
+                                        <input type="text" placeholder="+ Tambah subtask..." value={subtaskInput} onChange={(e) => setSubtaskInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addSubtask(); }} className="flex-1 rounded-xl border border-border bg-surface-1 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+                                        <button onClick={addSubtask} disabled={addingSubtask || !subtaskInput.trim()} className="px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-colors">
+                                            {addingSubtask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                        </button>
+                                    </div>
+                                )}
                             </section>
 
                             {/* Attachments */}
@@ -814,7 +855,17 @@ export default function TaskDetailModal({
                                     ))}
                                 </div>
                                 <div className="flex gap-2 items-end relative">
-                                    <textarea ref={commentInputRef} placeholder="Tulis komentar... (Enter untuk kirim)" value={commentText} onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(); } }} className="w-full rounded-xl border border-border bg-surface-1 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 resize-none" rows={2} />
+                                    {mentionSearch !== null && filteredMentions.length > 0 && (
+                                        <div className="absolute bottom-full left-0 mb-2 w-64 max-h-48 overflow-y-auto rounded-xl border border-border bg-surface-1 shadow-xl z-50 p-1">
+                                            {filteredMentions.map(u => (
+                                                <button key={u.id} onClick={() => insertMention(u.username)} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-surface-2 transition-colors flex flex-col">
+                                                    <span className="font-semibold text-foreground">{u.username}</span>
+                                                    <span className="text-xs text-muted">{u.email}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <textarea ref={commentInputRef} placeholder="Tulis komentar... (Gunakan @ untuk mention orang dalam project)" value={commentText} onChange={handleCommentChange} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(); } }} className="w-full rounded-xl border border-border bg-surface-1 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 resize-none" rows={2} />
                                     <button onClick={submitComment} disabled={submittingComment || !commentText.trim()} className="absolute right-2 bottom-2 p-1.5 text-primary disabled:opacity-40"><Send className="h-4 w-4" /></button>
                                 </div>
                             </section>

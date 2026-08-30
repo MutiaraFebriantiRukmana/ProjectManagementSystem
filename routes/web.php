@@ -108,16 +108,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/comments/{comment}', [CommentController::class, 'destroy'])->name('comments.destroy');
 
     // --- Attachments (Secure Upload & Download) ---
+// --- Attachments (Secure Upload & Download) ---
     Route::post('/tasks/{task}/attachments', [AttachmentController::class, 'store'])->name('attachments.store');
     Route::get('/attachments/{attachment}/download', [AttachmentController::class, 'download'])->name('attachments.download');
 
-    // --- Approval Workflow ---
+    // --- Project Member Management ---
+    Route::post('/projects/{project}/members', [ProjectController::class, 'addMember'])->name('projects.members.add');
+    Route::delete('/projects/{project}/members/{user}', [ProjectController::class, 'removeMember'])->name('projects.members.remove');
+
+    // --- Approval Workflow (Poin 10 Brief) ---
     Route::post('/tasks/{task}/submit-review', [ApprovalController::class, 'submitReview'])->name('tasks.submit-review');
     Route::post('/tasks/{task}/approve', [ApprovalController::class, 'approve'])->name('tasks.approve');
     Route::post('/tasks/{task}/reject', [ApprovalController::class, 'reject'])->name('tasks.reject');
 
-    // --- Notifications ---
+    // --- Notifications (Poin 13 Brief) ---
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+
+    // --- Admin Suite (Kelola User & Role dari Temanmu) ---
+    Route::middleware(['role:super_admin|Super Admin'])->prefix('admin')->name('admin.')->group(function () {
+        Route::resource('users', \App\Http\Controllers\Admin\UserController::class)->except(['create', 'show', 'edit']);
+        Route::get('roles', [\App\Http\Controllers\Admin\RolePermissionController::class, 'index'])->name('roles.index');
+        Route::patch('roles/{role}/permissions', [\App\Http\Controllers\Admin\RolePermissionController::class, 'updatePermissions'])->name('roles.update-permissions');
+    });
 });
