@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
+import NotificationDropdown from '@/Components/NotificationDropdown';
 import { 
   LayoutDashboard, 
   Users, 
@@ -11,7 +12,8 @@ import {
   Menu, 
   X,
   User as UserIcon,
-  ShieldCheck
+  ShieldCheck,
+  KeyRound,
 } from 'lucide-react';
 
 export default function AuthenticatedLayout({
@@ -21,8 +23,9 @@ export default function AuthenticatedLayout({
   header?: string;
   children: React.ReactNode;
 }) {
-  const { auth } = usePage<PageProps>().props;
+  const { auth, url } = usePage<PageProps & { url: string }>().props;
   const user = auth.user;
+  const currentUrl = usePage().url;
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Ambil role utama dari Spatie array
@@ -50,6 +53,23 @@ export default function AuthenticatedLayout({
 
   const handleLogout = () => {
     router.post('/logout');
+  };
+
+  const isDashboard = currentUrl === '/dashboard' || currentUrl.startsWith('/dashboard?');
+  const isProjects = currentUrl.startsWith('/projects');
+  const isUsers = currentUrl.startsWith('/admin/users');
+  const isRoles = currentUrl.startsWith('/admin/roles') || currentUrl.startsWith('/admin/permissions');
+
+  const getNavLinkClass = (active: boolean) => {
+    return `group flex items-center gap-3 px-4 py-3 text-sm transition-all ${
+      active
+        ? 'bg-gradient-to-r from-primary/20 to-transparent border-l-4 border-primary text-white font-semibold rounded-r-xl'
+        : 'text-muted hover:bg-surface-2 hover:text-foreground rounded-xl border-l-4 border-transparent font-medium'
+    }`;
+  };
+
+  const getNavIconClass = (active: boolean) => {
+    return `h-5 w-5 transition-colors ${active ? 'text-primary' : 'group-hover:text-primary'}`;
   };
 
   return (
@@ -102,21 +122,30 @@ export default function AuthenticatedLayout({
         </div>
 
         <nav className="flex-1 space-y-1.5 p-4 overflow-y-auto relative z-10">
-          <Link href="/dashboard" className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all ${typeof route === 'function' && route().current('dashboard') ? 'bg-gradient-to-r from-primary/15 to-transparent border-l-2 border-primary text-foreground' : 'text-muted hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent hover:text-foreground'}`}>
-            <LayoutDashboard className={`h-5 w-5 ${typeof route === 'function' && route().current('dashboard') ? 'text-secondary' : 'hover:text-secondary transition-colors'}`} />
+          <Link href="/dashboard" className={getNavLinkClass(isDashboard)}>
+            <LayoutDashboard className={getNavIconClass(isDashboard)} />
             <span>Dasbor</span>
           </Link>
 
-          <Link href="/projects" className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all ${typeof route === 'function' && route().current('projects.*') ? 'bg-gradient-to-r from-primary/15 to-transparent border-l-2 border-primary text-foreground' : 'text-muted hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent hover:text-foreground'}`}>
-            <Briefcase className={`h-5 w-5 ${typeof route === 'function' && route().current('projects.*') ? 'text-secondary' : 'hover:text-secondary transition-colors'}`} />
+          <Link href="/projects" className={getNavLinkClass(isProjects)}>
+            <Briefcase className={getNavIconClass(isProjects)} />
             <span>Manajemen Project</span>
           </Link>
 
           {(currentRole === 'super_admin' || currentRole === 'Super Admin') && (
-            <a href="#" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent hover:text-foreground transition-all">
-              <Users className="h-5 w-5 hover:text-secondary transition-colors" />
-              <span>Kelola User & Role</span>
-            </a>
+            <>
+              <div className="mt-2 mb-1 px-4">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Admin</span>
+              </div>
+              <Link href="/admin/users" className={getNavLinkClass(isUsers)}>
+                <Users className={getNavIconClass(isUsers)} />
+                <span>Kelola Pengguna</span>
+              </Link>
+              <Link href="/admin/roles" className={getNavLinkClass(isRoles)}>
+                <KeyRound className={getNavIconClass(isRoles)} />
+                <span>Kelola Hak Akses</span>
+              </Link>
+            </>
           )}
         </nav>
 
@@ -146,7 +175,11 @@ export default function AuthenticatedLayout({
             <h1 className="font-semibold text-lg text-foreground">{header || 'Dashboard'}</h1>
           </div>
           <div className="flex items-center gap-4">
-            <div className="hidden sm:flex flex-col text-right">
+            
+            {/* 🔔 PASANG LONCENG NOTIFIKASI DI SINI! */}
+            <NotificationDropdown />
+
+            <div className="hidden sm:flex flex-col text-right border-l border-border pl-4">
               <span className="text-sm font-medium text-foreground">{user?.username}</span>
               <span className="text-xs text-muted-foreground capitalize">{currentRole.replace('_', ' ')}</span>
             </div>
