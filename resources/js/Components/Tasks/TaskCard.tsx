@@ -10,6 +10,7 @@ import {
     Paperclip,
     Calendar,
     Clock,
+    ShieldCheck,
 } from 'lucide-react';
 
 // ─── Priority config ──────────────────────────────────────────────────────────
@@ -134,6 +135,19 @@ export default function TaskCard({ task, onClick, isDragging = false }: TaskCard
                     <PriorityIcon className="h-3 w-3" />
                     {priority.label}
                 </span>
+
+                {task.requires_approval && (
+                    <span 
+                        className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${
+                            task.status === 'review'
+                                ? 'border-warning/40 bg-warning/20 text-warning animate-pulse'
+                                : 'border-amber-500/25 bg-amber-500/10 text-amber-400'
+                        }`}
+                    >
+                        <ShieldCheck className="h-3 w-3 shrink-0" />
+                        <span>{task.status === 'review' ? 'Review PM' : 'Approval'}</span>
+                    </span>
+                )}
 
                 {(task.labels ?? []).map((label) => (
                     <span
