@@ -143,10 +143,8 @@ export default function CreateTaskModal({
     defaultStatus = 'todo',
     onClose,
 }: CreateTaskModalProps) {
-    // Filter assignees strictly to 'member' role
-    const assignableMembers = projectMembers.filter(m => 
-        m.roles?.some((r: any) => (r.name || r) === 'member')
-    );
+    // Filter assignees (use all project members)
+    const assignableMembers = projectMembers;
 
     const { data, setData, post, processing, errors, reset } = useForm({
         project_id: projectId,
@@ -303,7 +301,7 @@ export default function CreateTaskModal({
                     {/* Assignees */}
                     <MultiSelect
                         id="task-assignees"
-                        label="Assignees"
+                        label="Ditugaskan Kepada (Assignees)"
                         items={assignableMembers}
                         selected={data.assignees}
                         getKey={(u) => u.id}
@@ -326,7 +324,7 @@ export default function CreateTaskModal({
                     {/* Dependencies */}
                     <MultiSelect
                         id="task-dependencies"
-                        label="Prerequisite (Dependencies)"
+                        label="Prasyarat (Dependencies)"
                         items={projectTasks}
                         selected={data.dependencies}
                         getKey={(t) => t.id}
@@ -340,13 +338,13 @@ export default function CreateTaskModal({
                             type="button"
                             id="task-requires-approval"
                             onClick={() => setData('requires_approval', !data.requires_approval)}
-                            className={`relative h-5 w-9 rounded-full transition-colors duration-200 shrink-0 ${
-                                data.requires_approval ? 'bg-primary' : 'bg-surface-3 border border-border'
+                            className={`relative h-5 w-9 rounded-full transition-colors duration-200 shrink-0 border ${
+                                data.requires_approval ? 'bg-primary border-primary' : 'bg-surface-3 border-border'
                             }`}
                         >
                             <span
-                                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
-                                    data.requires_approval ? 'translate-x-4' : 'translate-x-0.5'
+                                className={`absolute top-[1px] left-[1px] h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                                    data.requires_approval ? 'translate-x-[14px]' : 'translate-x-0'
                                 }`}
                             />
                         </button>

@@ -14,6 +14,7 @@ import {
   AlertCircle,
   UserCog,
 } from 'lucide-react';
+import ConfirmModal from '@/Components/ConfirmModal';
 
 type Status = 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled';
 
@@ -83,16 +84,23 @@ export default function Create({ managers, available_members }: CreateProps) {
     end_date:    '',
   });
 
+  const [showConfirm, setShowConfirm] = React.useState(false);
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    post('/projects');
+    setShowConfirm(true);
+  };
+
+  const handleConfirm = () => {
+    setShowConfirm(false);
+    post('/projects', { preserveScroll: true });
   };
 
   return (
     <AuthenticatedLayout header="Buat Project Baru">
       <Head title="Buat Project Baru" />
 
-      <div className="max-w-2xl space-y-6">
+      <div className="w-full space-y-6">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-sm text-muted">
           <Link href="/dashboard" className="hover:text-foreground transition-colors">
@@ -256,6 +264,17 @@ export default function Create({ managers, available_members }: CreateProps) {
           </form>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={showConfirm}
+        title="Simpan Project"
+        message="Apakah Anda yakin ingin menyimpan data ini?"
+        confirmText="Ya, Simpan"
+        cancelText="Batal"
+        type="primary"
+        onConfirm={handleConfirm}
+        onCancel={() => setShowConfirm(false)}
+      />
     </AuthenticatedLayout>
   );
 }
