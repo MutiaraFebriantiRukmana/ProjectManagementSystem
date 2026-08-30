@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import ConfirmModal from '@/Components/ConfirmModal';
 
 interface IndexProps {
   projects: PaginatedResponse<Project>;
@@ -118,7 +119,10 @@ function ProjectCard({
   const maxAvatars = 3;
 
   return (
-    <div className="glass-card p-8 flex flex-col gap-4 hover:border-border-light transition-all duration-300 group relative">
+    <div 
+      onClick={() => router.visit(`/projects/${project.id}`)}
+      className="glass-card p-8 flex flex-col gap-4 hover:border-border-light transition-all duration-300 group relative cursor-pointer"
+    >
       {/* Top row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -143,7 +147,10 @@ function ProjectCard({
           <div className="relative shrink-0">
             <button
               id={`project-menu-${project.id}`}
-              onClick={() => setMenuOpen((v) => !v)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen((v) => !v);
+              }}
               className="p-1.5 rounded-lg text-muted hover:bg-surface-2 hover:text-foreground transition-colors"
             >
               <MoreVertical className="h-4 w-4" />
@@ -152,9 +159,15 @@ function ProjectCard({
               <>
                 <div
                   className="fixed inset-0 z-10"
-                  onClick={() => setMenuOpen(false)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen(false);
+                  }}
                 />
-                <div className="absolute right-0 top-8 z-20 w-40 rounded-xl border border-border bg-surface-2 py-1 shadow-xl">
+                <div 
+                  className="absolute right-0 top-8 z-20 w-40 rounded-xl border border-border bg-surface-2 py-1 shadow-xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   {canEdit && (
                     <Link
                       href={`/projects/${project.id}/edit`}
@@ -166,7 +179,8 @@ function ProjectCard({
                   )}
                   {canDelete && (
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setMenuOpen(false);
                         onDelete(project.id, project.name);
                       }}
@@ -240,14 +254,16 @@ function ProjectCard({
               })
             : '—'}
         </span>
-        <Link
-          id={`open-project-${project.id}`}
-          href={`/projects/${project.id}`}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            router.visit(`/projects/${project.id}`);
+          }}
           className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
         >
           <Eye className="h-3.5 w-3.5" />
           Buka Project
-        </Link>
+        </button>
       </div>
     </div>
   );
@@ -527,61 +543,17 @@ export default function Index({ projects, filters }: IndexProps) {
       </div>
 
       {/* ── Delete Confirmation Modal ─────────────────────────────────── */}
-      {deleteTarget && (
-        <DeleteModal
-          name={deleteTarget.name}
-          onConfirm={confirmDelete}
-          onCancel={() => setDeleteTarget(null)}
-        />
-      )}
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        title="Hapus Project?"
+        message={`Apakah Anda yakin ingin menghapus project "${deleteTarget?.name}"? Tindakan ini tidak dapat dibatalkan.`}
+        confirmText="Ya, Hapus"
+        cancelText="Batal"
+        type="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </AuthenticatedLayout>
-  );
-}
-
-// ─── Delete Modal ────────────────────────────────────────────────────────────
-function DeleteModal({
-  name,
-  onConfirm,
-  onCancel,
-}: {
-  name: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="glass-card p-8 w-full max-w-md shadow-2xl">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-error/10 border border-error/20">
-            <Trash2 className="h-6 w-6 text-error" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-foreground">Hapus Project?</h3>
-            <p className="text-sm text-muted">Tindakan ini tidak dapat dibatalkan.</p>
-          </div>
-        </div>
-        <p className="text-sm text-muted mb-6">
-          Anda akan menghapus project{' '}
-          <span className="font-semibold text-foreground">"{name}"</span>.
-          Semua data terkait akan ikut terhapus.
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 rounded-xl border border-border py-2.5 text-sm font-medium text-muted hover:bg-surface-2 transition-colors"
-          >
-            Batal
-          </button>
-          <button
-            id="confirm-delete-project"
-            onClick={onConfirm}
-            className="flex-1 rounded-xl bg-error py-2.5 text-sm font-semibold text-white hover:brightness-110 transition-all"
-          >
-            Ya, Hapus
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 

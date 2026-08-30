@@ -277,7 +277,8 @@ function ProjectTable({
 export default function Dashboard({ stats, projects = [], filters = { status: '' } }: DashboardProps) {
   const { auth } = usePage<PageProps>().props;
   const user = auth.user;
-  const role = user?.roles?.[0] || 'member';
+  const roleRaw = user?.roles?.[0];
+  const role = (typeof roleRaw === 'string' ? roleRaw : roleRaw?.name) || 'member';
 
   const isSuperAdmin   = role === 'super_admin' || role === 'Super Admin';
   const isProjectMgr   = role === 'project_manager' || role === 'Project Manager';

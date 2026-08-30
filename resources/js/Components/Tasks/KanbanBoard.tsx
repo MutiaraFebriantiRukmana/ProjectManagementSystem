@@ -401,7 +401,7 @@ export default function KanbanBoard({
                                             {colTasks.length === 0 && !snapshot.isDraggingOver && (
                                                 <div className="flex flex-1 items-center justify-center py-8">
                                                     <p className="text-[11px] text-muted/50 text-center">
-                                                        Drop tasks here
+                                                        Letakkan tugas di sini
                                                     </p>
                                                 </div>
                                             )}

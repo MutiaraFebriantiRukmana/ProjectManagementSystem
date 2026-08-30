@@ -14,6 +14,7 @@ import {
   AlertCircle,
   UserCog,
 } from 'lucide-react';
+import ConfirmModal from '@/Components/ConfirmModal';
 
 type Status = 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled';
 
@@ -85,16 +86,23 @@ export default function Edit({ project, managers, available_members }: EditProps
       : '',
   });
 
+  const [showConfirm, setShowConfirm] = React.useState(false);
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    put(`/projects/${project.id}`);
+    setShowConfirm(true);
+  };
+
+  const handleConfirm = () => {
+    setShowConfirm(false);
+    put(`/projects/${project.id}`, { preserveScroll: true });
   };
 
   return (
     <AuthenticatedLayout header={`Edit: ${project.name}`}>
       <Head title={`Edit — ${project.name}`} />
 
-      <div className="max-w-2xl space-y-6">
+      <div className="w-full space-y-6">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-sm text-muted">
           <Link href="/dashboard" className="hover:text-foreground transition-colors">
@@ -268,6 +276,17 @@ export default function Edit({ project, managers, available_members }: EditProps
           </form>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={showConfirm}
+        title="Simpan Perubahan"
+        message="Apakah Anda yakin ingin menyimpan perubahan pada project ini?"
+        confirmText="Ya, Simpan"
+        cancelText="Batal"
+        type="primary"
+        onConfirm={handleConfirm}
+        onCancel={() => setShowConfirm(false)}
+      />
     </AuthenticatedLayout>
   );
 }
