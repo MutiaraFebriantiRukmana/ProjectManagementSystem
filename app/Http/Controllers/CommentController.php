@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Gate;
 
 class CommentController extends Controller
 {
-    public function store(Request $request, Task $task): RedirectResponse
+    public function store(Request $request, Task $task, \App\Services\MentionParserService $mentionParser): RedirectResponse
     {
         Gate::authorize('view', $task);
 
@@ -20,30 +20,16 @@ class CommentController extends Controller
             'comment' => ['required', 'string', 'max:2000'],
         ]);
 
-        $comment = $task->comments()->create([
-            'user_id' => Auth::id(),
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $task->comments()->create([
+            'user_id' => $user->id,
             'comment' => $request->comment,
         ]);
 
-        preg_match_all('/@(\w+)/', $request->comment, $matches);
-        if (!empty($matches[1])) {
-            $usernames = array_unique($matches[1]);
-            
-            $project = $task->project;
-            $memberIds = $project->members()->pluck('users.id')->toArray();
-            if ($project->manager_id) {
-                $memberIds[] = $project->manager_id;
-            }
-
-            $userIds = User::whereIn('username', $usernames)
-                ->whereIn('id', $memberIds)
-                ->where('id', '!=', Auth::id()) // Self-mention protection
-                ->pluck('id');
-
-            if ($userIds->isNotEmpty()) {
-                $comment->mentions()->sync($userIds);
-            }
-        }
+        // Panggil Engine Mention Parser
+        $mentionParser->parseAndNotify($request->comment, $task, $user);
 
         return back()->with('success', 'Komentar berhasil ditambahkan.');
     }
