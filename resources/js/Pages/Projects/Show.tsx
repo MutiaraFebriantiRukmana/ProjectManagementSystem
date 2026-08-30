@@ -94,16 +94,23 @@ function AddMemberModal({
     ]);
     const available = allUsers.filter((u) => !memberIds.has(u.id));
 
+    const [confirmAdd, setConfirmAdd] = useState(false);
+
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
+        setConfirmAdd(true);
+    };
+
+    const handleConfirmSubmit = () => {
         post(`/projects/${project.id}/members`, {
-            onSuccess: () => { reset(); onClose(); },
+            onSuccess: () => { reset(); onClose(); setConfirmAdd(false); },
+            onError: () => setConfirmAdd(false),
         });
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="glass-card p-8 w-full max-w-md shadow-2xl">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="glass-card p-8 w-full max-w-md shadow-2xl relative z-[110]">
                 <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
@@ -156,6 +163,17 @@ function AddMemberModal({
                     </form>
                 )}
             </div>
+            
+            <ConfirmModal
+                isOpen={confirmAdd}
+                title="Konfirmasi Tambah Anggota"
+                message="Apakah Anda yakin ingin menambahkan user ini ke dalam project?"
+                onConfirm={handleConfirmSubmit}
+                onCancel={() => setConfirmAdd(false)}
+                confirmText="Ya, Tambahkan"
+                cancelText="Batal"
+                type="primary"
+            />
         </div>
     );
 }

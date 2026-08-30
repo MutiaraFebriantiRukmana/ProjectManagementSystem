@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import NotificationDropdown from '@/Components/NotificationDropdown';
+import ConfirmModal from '@/Components/ConfirmModal';
 import { 
   LayoutDashboard, 
   Users, 
@@ -28,6 +29,7 @@ export default function AuthenticatedLayout({
   const user = auth.user;
   const currentUrl = usePage().url;
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   // Ambil role utama dari Spatie array
   const roleRaw = user?.roles?.[0];
@@ -53,6 +55,10 @@ export default function AuthenticatedLayout({
   };
 
   const handleLogout = () => {
+    setConfirmLogout(true);
+  };
+
+  const executeLogout = () => {
     router.post('/logout');
   };
 
@@ -201,6 +207,17 @@ export default function AuthenticatedLayout({
           </div>
         </main>
       </div>
+      
+      <ConfirmModal
+        isOpen={confirmLogout}
+        title="Konfirmasi Keluar"
+        message="Apakah Anda yakin ingin keluar dari sistem?"
+        onConfirm={executeLogout}
+        onCancel={() => setConfirmLogout(false)}
+        confirmText="Ya, Keluar"
+        cancelText="Batal"
+        type="danger"
+      />
     </div>
   );
 }
