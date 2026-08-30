@@ -47,4 +47,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('projects.members.add');
     Route::delete('/projects/{project}/members/{user}', [ProjectController::class, 'removeMember'])
         ->name('projects.members.remove');
+
+    // Admin Suite
+    Route::middleware(['role:super_admin|Super Admin'])->prefix('admin')->name('admin.')->group(function () {
+        Route::resource('users', \App\Http\Controllers\Admin\UserController::class)->except(['create', 'show', 'edit']);
+        Route::get('roles', [\App\Http\Controllers\Admin\RolePermissionController::class, 'index'])->name('roles.index');
+        Route::patch('roles/{role}/permissions', [\App\Http\Controllers\Admin\RolePermissionController::class, 'updatePermissions'])->name('roles.permissions.update');
+    });
 });

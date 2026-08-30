@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { router, useForm } from '@inertiajs/react';
+import { router, useForm, usePage } from '@inertiajs/react';
 import { Task, Comment, TaskAttachment, User } from '@/types';
 import {
     X,
@@ -25,6 +25,7 @@ import {
     ArrowDown,
 } from 'lucide-react';
 import ConfirmModal from '@/Components/ConfirmModal';
+import { hasPermission } from '@/utils/permissions';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatBytes(bytes: number): string {
@@ -125,7 +126,9 @@ export default function TaskDetailModal({
     const isProjectManager = currentUser.id === projectManagerId;
     const isCanApprove = isSuperAdmin || isProjectManager;
     const isAssignee = (task.assignees ?? []).some((a) => a.id === currentUser.id);
-    const isCanDelete = isSuperAdmin || isProjectManager;
+    const { auth } = usePage<any>().props;
+    const isCanDelete = hasPermission(auth, 'tasks.delete') || isProjectManager;
+    const canEditTask = hasPermission(auth, 'tasks.edit') || isProjectManager;
 
     const priority = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
     const PriorityIcon = priority.Icon;
@@ -431,12 +434,14 @@ export default function TaskDetailModal({
                                         </button>
                                     ))}
                                 </div>
-                                <div className="flex gap-2 mt-3">
-                                    <input type="text" placeholder="+ Tambah subtask..." value={subtaskInput} onChange={(e) => setSubtaskInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addSubtask(); }} className="flex-1 rounded-xl border border-border bg-surface-1 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
-                                    <button onClick={addSubtask} disabled={addingSubtask || !subtaskInput.trim()} className="px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-colors">
-                                        {addingSubtask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                                    </button>
-                                </div>
+                                {canEditTask && (
+                                    <div className="flex gap-2 mt-3">
+                                        <input type="text" placeholder="+ Tambah subtask..." value={subtaskInput} onChange={(e) => setSubtaskInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addSubtask(); }} className="flex-1 rounded-xl border border-border bg-surface-1 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+                                        <button onClick={addSubtask} disabled={addingSubtask || !subtaskInput.trim()} className="px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-colors">
+                                            {addingSubtask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                        </button>
+                                    </div>
+                                )}
                             </section>
 
                             {/* Attachments */}
