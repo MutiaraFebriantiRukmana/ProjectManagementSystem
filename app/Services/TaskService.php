@@ -15,8 +15,15 @@ class TaskService
      */
     public function updateStatus(Task $task, string $newStatus): Task
     {
+        // 1. BLOKIR DRAG-DROP MANUAL UNTUK TASK YANG BUTUH APPROVAL
+        if ($task->requires_approval && in_array($newStatus, ['review', 'done'])) {
+            throw ValidationException::withMessages([
+                'status' => 'Task ini membutuhkan Approval! Tidak bisa digeser manual ke kolom Review atau Done. Silakan buka task dan gunakan tombol aksi di dalamnya.'
+            ]);
+        }
+
+        // 2. VALIDASI TASK DEPENDENCY (Blocker)
         if ($newStatus === 'done') {
-            // Ambil semua task dependensi yang statusnya belum 'done'
             $unfinishedDependencies = $task->dependencies()
                 ->where('status', '!=', 'done')
                 ->pluck('title');

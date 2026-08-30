@@ -1,12 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { router, useForm } from '@inertiajs/react';
-import { Task, Comment, TaskAttachment, User } from '@/types';
+import { Task, Comment, TaskAttachment, User, Approval } from '@/types';
 import {
     X,
     Loader2,
     Trash2,
     Send,
-    Paperclip,
     Download,
     CheckSquare,
     Square,
@@ -23,6 +22,14 @@ import {
     ArrowUp,
     Minus,
     ArrowDown,
+    ShieldCheck,
+    SendHorizonal,
+    CheckCircle,
+    XCircle,
+    History,
+    Clock,
+    ChevronDown,
+    ChevronUp,
 } from 'lucide-react';
 import ConfirmModal from '@/Components/ConfirmModal';
 
@@ -46,6 +53,13 @@ function timeAgo(dateStr: string): string {
     return `${diffDay} hari lalu`;
 }
 
+function formatDateTime(dateStr: string): string {
+    return new Date(dateStr).toLocaleString('id-ID', {
+        day: 'numeric', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+    });
+}
+
 function getFileIcon(filetype: string) {
     if (filetype.startsWith('image/')) return <FileImage className="h-4 w-4 text-blue-400" />;
     if (filetype === 'application/pdf') return <FileText className="h-4 w-4 text-red-400" />;
@@ -61,11 +75,32 @@ const STATUS_LABELS: Record<Task['status'], string> = {
 };
 
 const PRIORITY_CONFIG = {
-    critical: { label: 'Critical', Icon: Flame, cls: 'text-red-400 bg-red-400/10 border-red-400/25' },
-    high:     { label: 'High',     Icon: ArrowUp, cls: 'text-orange-400 bg-orange-400/10 border-orange-400/25' },
-    medium:   { label: 'Medium',   Icon: Minus, cls: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/25' },
+    critical: { label: 'Critical', Icon: Flame,     cls: 'text-red-400 bg-red-400/10 border-red-400/25' },
+    high:     { label: 'High',     Icon: ArrowUp,   cls: 'text-orange-400 bg-orange-400/10 border-orange-400/25' },
+    medium:   { label: 'Medium',   Icon: Minus,     cls: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/25' },
     low:      { label: 'Low',      Icon: ArrowDown, cls: 'text-slate-400 bg-slate-400/10 border-slate-400/25' },
 };
+
+// ─── Approval Status Config ───────────────────────────────────────────────────
+const APPROVAL_STATUS_CONFIG: Record<
+    Approval['status'],
+    { label: string; dotCls: string; badgeCls: string; Icon: React.ElementType }
+> = {
+    pending:           { label: 'Menunggu Review',  dotCls: 'bg-warning',   badgeCls: 'text-warning bg-warning/10 border-warning/25',     Icon: Clock },
+    approved:          { label: 'Disetujui',         dotCls: 'bg-success',   badgeCls: 'text-success bg-success/10 border-success/25',     Icon: CheckCircle },
+    rejected:          { label: 'Ditolak',           dotCls: 'bg-error',     badgeCls: 'text-error bg-error/10 border-error/25',           Icon: XCircle },
+    revision_required: { label: 'Revisi Diminta',    dotCls: 'bg-error',     badgeCls: 'text-error bg-error/10 border-error/25',           Icon: RotateCcw },
+};
+
+function getApprovalDisplayStatus(task: Task): Approval['status'] | null {
+    const approvals = task.approvals ?? [];
+    if (approvals.length === 0) {
+        if (task.status === 'review') return 'pending';
+        if (task.status === 'done')   return 'approved';
+        return null;
+    }
+    return approvals[approvals.length - 1].status;
+}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface TaskDetailModalProps {
@@ -97,12 +132,10 @@ export default function TaskDetailModal({
     const [submittingComment, setSubmittingComment] = useState(false);
     const [subtaskInput, setSubtaskInput] = useState('');
     const [addingSubtask, setAddingSubtask] = useState(false);
-    const [uploadingFile, setUploadingFile] = useState(false);
     const [deletingTask, setDeletingTask] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [togglingStatus, setTogglingStatus] = useState(false);
     const [dragOver, setDragOver] = useState(false);
-    const [mentionSearch, setMentionSearch] = useState<string | null>(null);
 
     // Editing assignee state
     const [editingAssignees, setEditingAssignees] = useState(false);
@@ -112,25 +145,39 @@ export default function TaskDetailModal({
     // Confirm upload state
     const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null);
 
-    const { data: uploadData, setData: setUploadData, post: postUpload, processing: uploadProcessing, progress, reset: resetUpload } = useForm({ file: null as File | null });
+    // ── Approval Workflow state ────────────────────────────────────────────────
+    const [submittingReview, setSubmittingReview] = useState(false);
+    const [approvingTask, setApprovingTask]       = useState(false);
+    const [rejectingTask, setRejectingTask]       = useState(false);
+    const [showRevisionInput, setShowRevisionInput] = useState(false);
+    const [revisionNote, setRevisionNote]           = useState('');
+    const [approveNote, setApproveNote]             = useState('');
+    const [showApproveNote, setShowApproveNote]     = useState(false);
+    const [showHistory, setShowHistory]             = useState(false);
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const { data: uploadData, setData: setUploadData, post: postUpload, processing: uploadProcessing, reset: resetUpload } = useForm({ file: null as File | null });
+
+    const fileInputRef    = useRef<HTMLInputElement>(null);
     const commentInputRef = useRef<HTMLTextAreaElement>(null);
 
-    // Ambil role secara aman (Object vs String)
-    const rawRole = currentUser?.roles?.[0];
+    // Ambil role secara aman
+    const rawRole  = currentUser?.roles?.[0];
     const roleName = typeof rawRole === 'object' ? rawRole?.name : (rawRole || 'member');
 
-    const isSuperAdmin = roleName === 'super_admin';
+    const isSuperAdmin     = roleName === 'super_admin';
     const isProjectManager = currentUser.id === projectManagerId;
-    const isCanApprove = isSuperAdmin || isProjectManager;
-    const isAssignee = (task.assignees ?? []).some((a) => a.id === currentUser.id);
-    const isCanDelete = isSuperAdmin || isProjectManager;
+    // Approval workflow: ONLY the project's assigned PM can approve/reject.
+    // Super Admin and Viewers are intentionally excluded — approval is a PM-to-member workflow.
+    const isCanApprove     = isProjectManager;
+    // Broader task management rights (edit assignees, delete) still include SA.
+    const isCanManageTask  = isSuperAdmin || isProjectManager;
+    const isAssignee       = (task.assignees ?? []).some((a) => a.id === currentUser.id);
+    const isReporter       = currentUser.id === task.reporter_id;
+    const isCanDelete      = isSuperAdmin || isProjectManager;
 
-    const priority = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
+    const priority     = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
     const PriorityIcon = priority.Icon;
 
-    // Sync when task prop changes from parent
     useEffect(() => {
         setTask(initialTask);
         setComments(initialTask.comments ?? []);
@@ -138,7 +185,6 @@ export default function TaskDetailModal({
         setSubtasks(initialTask.subtasks ?? []);
     }, [initialTask]);
 
-    // Close on Escape
     useEffect(() => {
         const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         document.addEventListener('keydown', handler);
@@ -279,12 +325,66 @@ export default function TaskDetailModal({
         });
     };
 
-    const submitForReview = () => changeStatus('review');
-    const approveTask     = () => changeStatus('done');
-    const requestRevision = () => changeStatus('in_progress');
+    // ── Approval Workflow Actions ──────────────────────────────────────────────
+    const submitForReview = () => {
+        if (submittingReview) return;
+        setSubmittingReview(true);
+        setTask((t) => ({ ...t, status: 'review' }));
+        router.post(
+            `/tasks/${task.id}/submit-review`,
+            {},
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onError: () => setTask((t) => ({ ...t, status: 'in_progress' })),
+                onFinish: () => setSubmittingReview(false),
+            }
+        );
+    };
+
+    const approveTask = () => {
+        if (approvingTask) return;
+        setApprovingTask(true);
+        const notes = approveNote.trim() || 'Task disetujui.';
+        setTask((t) => ({ ...t, status: 'done' }));
+        router.post(
+            `/tasks/${task.id}/approve`,
+            { notes },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onError: () => setTask((t) => ({ ...t, status: 'review' })),
+                onFinish: () => {
+                    setApprovingTask(false);
+                    setShowApproveNote(false);
+                    setApproveNote('');
+                },
+            }
+        );
+    };
+
+    const requestRevision = () => {
+        if (!revisionNote.trim() || rejectingTask) return;
+        setRejectingTask(true);
+        setTask((t) => ({ ...t, status: 'in_progress' }));
+        router.post(
+            `/tasks/${task.id}/reject`,
+            { notes: revisionNote.trim() },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onError: () => setTask((t) => ({ ...t, status: 'review' })),
+                onFinish: () => {
+                    setRejectingTask(false);
+                    setShowRevisionInput(false);
+                    setRevisionNote('');
+                },
+            }
+        );
+    };
 
     const completedSubtasks = subtasks.filter((s) => s.status === 'done').length;
-    const blockedDeps = (task.dependencies ?? []).filter((d) => d.status !== 'done');
+    const blockedDeps       = (task.dependencies ?? []).filter((d) => d.status !== 'done');
 
     const saveAssignees = () => {
         if (updatingAssignees) return;
@@ -299,10 +399,13 @@ export default function TaskDetailModal({
     };
 
     const toggleAssignee = (userId: number) => {
-        setSelectedAssignees(prev => 
+        setSelectedAssignees(prev =>
             prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
         );
     };
+
+    const approvalDisplayStatus = task.requires_approval ? getApprovalDisplayStatus(task) : null;
+    const approvals             = task.approvals ?? [];
 
     return (
         <>
@@ -321,6 +424,12 @@ export default function TaskDetailModal({
                                     <PriorityIcon className="h-3 w-3" />
                                     {priority.label}
                                 </span>
+                                {task.requires_approval && (
+                                    <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold border border-primary/25 bg-primary/10 text-primary">
+                                        <ShieldCheck className="h-3 w-3" />
+                                        Butuh Approval
+                                    </span>
+                                )}
                                 {(task.labels ?? []).map((l) => (
                                     <span key={l.id} className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold border" style={{ backgroundColor: `${l.color}18`, color: l.color, borderColor: `${l.color}35` }}>
                                         {l.name}
@@ -346,16 +455,37 @@ export default function TaskDetailModal({
                     <div className="flex-1 overflow-y-auto">
                         <div className="px-8 py-6 space-y-8">
                             
-                            {/* Status */}
+                            {/* Status Selector */}
                             <section>
                                 <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Status</h3>
                                 <div className="flex flex-wrap gap-2">
-                                    {(Object.keys(STATUS_LABELS) as Task['status'][]).map((s) => (
-                                        <button key={s} onClick={() => changeStatus(s)} disabled={togglingStatus} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all ${task.status === s ? 'bg-primary/15 border-primary/30 text-primary' : 'border-border text-muted hover:bg-surface-2 hover:text-foreground'}`}>
-                                            {STATUS_LABELS[s]}
-                                        </button>
-                                    ))}
+                                    {(Object.keys(STATUS_LABELS) as Task['status'][]).map((s) => {
+                                        // 🔒 BLOKIR MANUAL CLICK KE 'REVIEW' & 'DONE' JIKA TASK MEMERLUKAN APPROVAL
+                                        const isApprovalRestricted = task.requires_approval && (s === 'review' || s === 'done');
+                                        return (
+                                            <button
+                                                key={s}
+                                                onClick={() => !isApprovalRestricted && changeStatus(s)}
+                                                disabled={togglingStatus || isApprovalRestricted}
+                                                title={isApprovalRestricted ? 'Gunakan alur Approval di bawah untuk status ini' : undefined}
+                                                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all ${
+                                                    task.status === s
+                                                        ? 'bg-primary/15 border-primary/30 text-primary'
+                                                        : isApprovalRestricted
+                                                        ? 'border-border/40 text-muted/30 cursor-not-allowed bg-surface-2/20'
+                                                        : 'border-border text-muted hover:bg-surface-2 hover:text-foreground'
+                                                }`}
+                                            >
+                                                {STATUS_LABELS[s]}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
+                                {task.requires_approval && (
+                                    <p className="text-[11px] text-muted mt-2 italic">
+                                        * Status <span className="text-primary font-medium">In Review</span> dan <span className="text-success font-medium">Done</span> dikendalikan lewat tombol <strong>Approval Workflow</strong> di bawah.
+                                    </p>
+                                )}
                             </section>
 
                             {/* Blocked info */}
@@ -375,6 +505,206 @@ export default function TaskDetailModal({
                                     </ul>
                                 </section>
                             )}
+
+                            {/* ══ APPROVAL WORKFLOW SECTION ══════════════════════════════════════ */}
+                            {task.requires_approval && (
+                                <section className="rounded-xl border border-border bg-surface-2/50 p-4 space-y-4">
+                                    {/* Section header */}
+                                    <div className="flex items-center gap-2">
+                                        <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
+                                        <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">Approval Workflow</h3>
+                                    </div>
+
+                                    {/* ── Status Banner ── */}
+                                    {approvalDisplayStatus ? (() => {
+                                        const cfg = APPROVAL_STATUS_CONFIG[approvalDisplayStatus];
+                                        const BannerIcon = cfg.Icon;
+                                        return (
+                                            <div className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${cfg.badgeCls}`}>
+                                                <BannerIcon className="h-4 w-4 shrink-0" />
+                                                {cfg.label}
+                                            </div>
+                                        );
+                                    })() : (
+                                        <div className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted">
+                                            <Clock className="h-4 w-4 shrink-0" />
+                                            Belum diajukan untuk review
+                                        </div>
+                                    )}
+
+                                    {/* ── Role-Gated Action Buttons ── */}
+                                    <div className="space-y-3">
+                                        {/* Member / Assignee / Reporter / PM: submit for review saat task berstatus todo / in_progress */}
+                                        {(isAssignee || isReporter || isCanApprove) && ['todo', 'in_progress'].includes(task.status) && (
+                                            <button
+                                                onClick={submitForReview}
+                                                disabled={submittingReview}
+                                                className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 active:scale-[0.98] transition-all disabled:opacity-60"
+                                            >
+                                                {submittingReview
+                                                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                                                    : <SendHorizonal className="h-4 w-4" />
+                                                }
+                                                Kirim untuk Review
+                                            </button>
+                                        )}
+
+                                        {/* PM / Admin: approve or request revision saat status in review */}
+                                        {isCanApprove && task.status === 'review' && (
+                                            <div className="space-y-3">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {/* Approve button */}
+                                                    <button
+                                                        onClick={() => {
+                                                            if (showApproveNote) {
+                                                                approveTask();
+                                                            } else {
+                                                                setShowApproveNote(true);
+                                                                setShowRevisionInput(false);
+                                                            }
+                                                        }}
+                                                        disabled={approvingTask}
+                                                        className="inline-flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-4 py-2.5 text-sm font-semibold text-success hover:bg-success/20 active:scale-[0.98] transition-all disabled:opacity-60"
+                                                    >
+                                                        {approvingTask
+                                                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                                                            : <CheckCircle className="h-4 w-4" />
+                                                        }
+                                                        {showApproveNote ? 'Konfirmasi Setujui' : 'Setujui'}
+                                                    </button>
+
+                                                    {/* Request revision button */}
+                                                    <button
+                                                        onClick={() => {
+                                                            setShowRevisionInput((v) => !v);
+                                                            setShowApproveNote(false);
+                                                        }}
+                                                        disabled={rejectingTask}
+                                                        className="inline-flex items-center gap-2 rounded-xl border border-error/30 bg-error/10 px-4 py-2.5 text-sm font-semibold text-error hover:bg-error/20 active:scale-[0.98] transition-all disabled:opacity-60"
+                                                    >
+                                                        {rejectingTask
+                                                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                                                            : <XCircle className="h-4 w-4" />
+                                                        }
+                                                        Minta Revisi
+                                                    </button>
+                                                </div>
+
+                                                {/* Optional approve note */}
+                                                {showApproveNote && (
+                                                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                        <textarea
+                                                            rows={2}
+                                                            placeholder="Catatan persetujuan (opsional)..."
+                                                            value={approveNote}
+                                                            onChange={(e) => setApproveNote(e.target.value)}
+                                                            className="w-full rounded-xl border border-success/20 bg-surface-1 px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-success/40 focus:ring-2 focus:ring-success/15 transition-all resize-none"
+                                                        />
+                                                        <button
+                                                            onClick={() => { setShowApproveNote(false); setApproveNote(''); }}
+                                                            className="text-xs text-muted hover:text-foreground transition-colors"
+                                                        >
+                                                            Batal
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {/* Required revision note */}
+                                                {showRevisionInput && (
+                                                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                        <textarea
+                                                            rows={3}
+                                                            autoFocus
+                                                            placeholder="Jelaskan revisi yang dibutuhkan... (wajib diisi)"
+                                                            value={revisionNote}
+                                                            onChange={(e) => setRevisionNote(e.target.value)}
+                                                            className="w-full rounded-xl border border-error/20 bg-surface-1 px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-error/40 focus:ring-2 focus:ring-error/15 transition-all resize-none"
+                                                        />
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                onClick={requestRevision}
+                                                                disabled={!revisionNote.trim() || rejectingTask}
+                                                                className="inline-flex items-center gap-2 rounded-lg border border-error/30 bg-error/10 px-3 py-1.5 text-xs font-semibold text-error hover:bg-error/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                                            >
+                                                                {rejectingTask
+                                                                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                    : <RotateCcw className="h-3.5 w-3.5" />
+                                                                }
+                                                                Kirim Permintaan Revisi
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { setShowRevisionInput(false); setRevisionNote(''); }}
+                                                                className="text-xs text-muted hover:text-foreground transition-colors"
+                                                            >
+                                                                Batal
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* ── Approval History Timeline ── */}
+                                    {approvals.length > 0 && (
+                                        <div className="border-t border-border pt-3 space-y-2">
+                                            <button
+                                                onClick={() => setShowHistory((v) => !v)}
+                                                className="flex items-center justify-between text-xs font-semibold text-muted hover:text-foreground transition-colors w-full text-left"
+                                            >
+                                                <span className="flex items-center gap-2">
+                                                    <History className="h-3.5 w-3.5" />
+                                                    Riwayat Approval ({approvals.length})
+                                                </span>
+                                                {showHistory
+                                                    ? <ChevronUp className="h-3.5 w-3.5" />
+                                                    : <ChevronDown className="h-3.5 w-3.5" />
+                                                }
+                                            </button>
+
+                                            {showHistory && (
+                                                <div className="relative mt-3 space-y-0 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                    {approvals.length > 1 && (
+                                                        <div className="absolute left-[7px] top-3 bottom-3 w-px bg-border" />
+                                                    )}
+                                                    {approvals.map((approval, idx) => {
+                                                        const cfg = APPROVAL_STATUS_CONFIG[approval.status];
+                                                        const EntryIcon = cfg.Icon;
+                                                        return (
+                                                            <div key={approval.id} className="relative flex gap-3 pb-4 last:pb-0">
+                                                                <div className={`relative z-10 h-3.5 w-3.5 rounded-full border-2 border-surface-1 shrink-0 mt-0.5 ${cfg.dotCls}`} />
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                                                                        <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${cfg.badgeCls}`}>
+                                                                            <EntryIcon className="h-2.5 w-2.5" />
+                                                                            {cfg.label}
+                                                                        </span>
+                                                                        <span className="text-xs font-semibold text-foreground">
+                                                                            {approval.approver?.username ?? 'System'}
+                                                                        </span>
+                                                                        <span className="text-[10px] text-muted ml-auto">
+                                                                            {timeAgo(approval.created_at)}
+                                                                        </span>
+                                                                    </div>
+                                                                    {approval.notes && (
+                                                                        <p className="text-xs text-muted leading-relaxed mt-1 italic">
+                                                                            "{approval.notes}"
+                                                                        </p>
+                                                                    )}
+                                                                    <p className="text-[10px] text-muted/60 mt-0.5">
+                                                                        {formatDateTime(approval.created_at)}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </section>
+                            )}
+                            {/* ══ END APPROVAL WORKFLOW SECTION ══════════════════════════════════ */}
 
                             {/* Assignees & Dates */}
                             <section className="grid grid-cols-2 gap-4">
