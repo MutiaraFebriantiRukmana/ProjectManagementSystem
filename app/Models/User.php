@@ -125,4 +125,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Task::class, 'reporter_id');
     }
+
+    public function commentMentions(): BelongsToMany
+    {
+        return $this->belongsToMany(Comment::class, 'comment_mentions');
+    }
 }
