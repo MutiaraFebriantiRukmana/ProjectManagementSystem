@@ -14,6 +14,7 @@ import {
   User as UserIcon,
   ShieldCheck,
   KeyRound,
+  FileText,
 } from 'lucide-react';
 
 export default function AuthenticatedLayout({
@@ -144,6 +145,10 @@ export default function AuthenticatedLayout({
               <Link href="/admin/roles" className={getNavLinkClass(isRoles)}>
                 <KeyRound className={getNavIconClass(isRoles)} />
                 <span>Kelola Hak Akses</span>
+              </Link>
+              <Link href="/admin/audit-logs" className={getNavLinkClass(currentUrl.startsWith('/admin/audit-logs'))}>
+                <FileText className={getNavIconClass(currentUrl.startsWith('/admin/audit-logs'))} />
+                <span>Log Aktivitas</span>
               </Link>
             </>
           )}
