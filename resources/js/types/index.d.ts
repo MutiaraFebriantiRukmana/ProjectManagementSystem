@@ -13,6 +13,16 @@ export interface Label {
     color: string;
 }
 
+export interface Approval {
+    id: number;
+    task_id: number;
+    approved_by?: number | null;
+    status: 'pending' | 'approved' | 'rejected' | 'revision_required';
+    notes?: string | null;
+    created_at: string;
+    approver?: User;
+}
+
 export interface Comment {
     id: number;
     task_id: number;
@@ -52,6 +62,7 @@ export interface Task {
     subtasks?: Task[];
     attachments?: TaskAttachment[];
     comments?: Comment[];
+    approvals?: Approval[];
 }
 
 export interface Project {

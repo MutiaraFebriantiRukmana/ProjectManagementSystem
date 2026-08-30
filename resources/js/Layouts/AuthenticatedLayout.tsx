@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
+import NotificationDropdown from '@/Components/NotificationDropdown';
 import { 
   LayoutDashboard, 
   Users, 
@@ -174,7 +175,11 @@ export default function AuthenticatedLayout({
             <h1 className="font-semibold text-lg text-foreground">{header || 'Dashboard'}</h1>
           </div>
           <div className="flex items-center gap-4">
-            <div className="hidden sm:flex flex-col text-right">
+            
+            {/* 🔔 PASANG LONCENG NOTIFIKASI DI SINI! */}
+            <NotificationDropdown />
+
+            <div className="hidden sm:flex flex-col text-right border-l border-border pl-4">
               <span className="text-sm font-medium text-foreground">{user?.username}</span>
               <span className="text-xs text-muted-foreground capitalize">{currentRole.replace('_', ' ')}</span>
             </div>

@@ -14,8 +14,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * ProjectController — Unified Version
- * Menggabungkan UI Project Temanmu + Task Backend & Eager Loading Buatanmu.
+ * ProjectController Unified Version
+ 
  */
 class ProjectController extends Controller
 {
@@ -108,7 +108,8 @@ class ProjectController extends Controller
                 'tasks.dependencies', 
                 'tasks.subtasks', 
                 'tasks.attachments', 
-                'tasks.comments.user'
+                'tasks.comments.user',
+                'tasks.approvals.approver'
             ]),
             'available_members' => $available_members,
             'labels'            => Label::all(),
