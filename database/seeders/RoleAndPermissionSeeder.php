@@ -40,7 +40,6 @@ class RoleAndPermissionSeeder extends Seeder
             'users.create',
             'users.update',
             'users.delete',
-            'roles.manage',          // Assign roles to users
 
             // --- Project Management ---
             'projects.view',         // View a project the user has access to
@@ -68,9 +67,6 @@ class RoleAndPermissionSeeder extends Seeder
             'comments.create',       // Post a comment
             'comments.update',       // Edit own comment
             'comments.delete',       // Delete comment
-
-            // --- Activity Logs (Audit Trail) ---
-            'audit_logs.view',    // View audit log (SA only)
         ];
 
         foreach ($permissions as $permission) {
