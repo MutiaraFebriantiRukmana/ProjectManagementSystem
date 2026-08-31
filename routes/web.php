@@ -100,8 +100,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ];
         });
 
+        $status = $request->query('status');
+        $dashboardProjectsQuery = Project::with('manager:id,username');
+        
+        if (!$user->hasRole('super_admin')) {
+            $dashboardProjectsQuery->where(function ($q) use ($user) {
+                $q->where('manager_id', $user->id)
+                  ->orWhereHas('members', fn ($m) => $m->where('user_id', $user->id));
+            });
+        }
+
+        if ($status) {
+            $dashboardProjectsQuery->where('status', $status);
+        }
+
+        $projects = $dashboardProjectsQuery->latest()->get(['id', 'name', 'start_date', 'end_date', 'status', 'manager_id']);
+
         return Inertia::render('Dashboard', [
             'stats' => $stats,
+            'projects' => $projects,
+            'filters' => ['status' => $status],
         ]);
     })->name('dashboard');
 
@@ -151,5 +169,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('users', \App\Http\Controllers\Admin\UserController::class)->except(['create', 'show', 'edit']);
         Route::get('roles', [\App\Http\Controllers\Admin\RolePermissionController::class, 'index'])->name('roles.index');
         Route::patch('roles/{role}/permissions', [\App\Http\Controllers\Admin\RolePermissionController::class, 'updatePermissions'])->name('roles.update-permissions');
+        Route::get('audit-logs', [\App\Http\Controllers\Admin\AuditLogController::class, 'index'])->name('audit-logs.index');
     });
 });

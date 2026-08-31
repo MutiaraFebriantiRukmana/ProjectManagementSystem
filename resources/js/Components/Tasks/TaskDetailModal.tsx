@@ -138,6 +138,7 @@ export default function TaskDetailModal({
     const [togglingStatus, setTogglingStatus] = useState(false);
     const [dragOver, setDragOver] = useState(false);
     const [mentionSearch, setMentionSearch] = useState<string | null>(null);
+    const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null);
 
     // Editing assignee state
     const [editingAssignees, setEditingAssignees] = useState(false);

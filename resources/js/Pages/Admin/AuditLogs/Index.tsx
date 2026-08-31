@@ -162,7 +162,7 @@ export default function AuditLogIndex({ logs, users, actions, filters }: Props) 
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
                                                     <div className="h-6 w-6 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">
-                                                        {log.user?.username?.charAt(0).toUpperCase() || '?'}
+                                                        {log.user?.username?.charAt(0)?.toUpperCase() || '?'}
                                                     </div>
                                                     <span className="font-semibold text-foreground text-xs">
                                                         {log.user?.username || 'Sistem Otomatis'}
@@ -176,7 +176,7 @@ export default function AuditLogIndex({ logs, users, actions, filters }: Props) 
                                             </td>
                                             <td className="px-6 py-4 text-xs text-muted">
                                                 <span className="font-mono text-foreground">
-                                                    {log.entity_type?.split('\\').pop()} #{log.entity_id}
+                                                    {log.entity_type?.split('\\')?.pop()} #{log.entity_id}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-right">
@@ -234,7 +234,7 @@ export default function AuditLogIndex({ logs, users, actions, filters }: Props) 
                                     Inspeksi Perubahan Data: {selectedLog.action}
                                 </h3>
                                 <p className="text-xs text-muted mt-0.5">
-                                    Target: {selectedLog.entity_type?.split('\\').pop()} #{selectedLog.entity_id} oleh {selectedLog.user?.username || 'Sistem'}
+                                    Target: {selectedLog.entity_type?.split('\\')?.pop()} #{selectedLog.entity_id} oleh {selectedLog.user?.username || 'Sistem'}
                                 </p>
                             </div>
                             <button
