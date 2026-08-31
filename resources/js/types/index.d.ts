@@ -43,6 +43,18 @@ export interface TaskAttachment {
     created_at: string;
 }
 
+export interface ActivityLog {
+    id: number;
+    user_id?: number | null;
+    action: string;
+    entity_type?: string | null;
+    entity_id?: number | null;
+    old_value?: Record<string, any> | null;
+    new_value?: Record<string, any> | null;
+    created_at: string;
+    user?: User | null;
+}
+
 export interface Task {
     id: number;
     project_id: number;
